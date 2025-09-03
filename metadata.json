@@ -1,0 +1,7 @@
+{
+  "name": "Kijko Video Brief Assistant",
+  "description": "A multimodal, speech-enabled Video Brief Assistant that expertly guides users through creating comprehensive Video Requirements Documents (VRDs) and managing the entire video production process.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
