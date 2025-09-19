@@ -66,7 +66,6 @@ export function classifyMessage(messageText: string): ClassifiedMessage {
       fullText: match[0].trim() // The full match
     });
   }
-  }
   
   // If we found enough options, return MCQ
   if (options.length >= 2) {
