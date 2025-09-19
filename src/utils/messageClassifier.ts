@@ -62,15 +62,19 @@ export function classifyMessage(messageText: string): ClassifiedMessage {
   const mcqKeywords = [
     'choose the', 'select the', 'which of the following',
     'what is the best', 'which option', 'pick the',
-    'the correct answer', 'which statement'
+    'the correct answer', 'which statement',
+    'rate your', 'scale of', 'on a scale', 'how would you rate', 'please rate', 'could you rate'
   ];
   
   const hasKeywords = mcqKeywords.some(keyword => 
     text.toLowerCase().includes(keyword.toLowerCase())
   );
   
+  // Additional pattern detection for scale/rating questions
+  const hasScalePattern = /scale of \d+(-\d+)?|rate.*\d+-\d+/i.test(text);
+  
   // Determine if this is an MCQ
-  const isMCQ = hasQuestionMark && options.length >= 2 && (hasKeywords || matchedPattern);
+  const isMCQ = hasQuestionMark && options.length >= 2 && (hasKeywords || matchedPattern || hasScalePattern);
   
   if (isMCQ && options.length > 0) {
     // Extract the stem (question part before options)
