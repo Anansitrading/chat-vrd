@@ -14,7 +14,7 @@ const getAvailableVoices = (): Voice[] => {
     return voices.map(voice => ({
       id: voice.name,
       name: voice.name,
-      description: `${voice.lang} - ${voice.gender || 'Unknown'}`
+      description: `${voice.lang} - ${voice.localService ? 'Local' : 'Remote'}`
     }));
   }
   return [
