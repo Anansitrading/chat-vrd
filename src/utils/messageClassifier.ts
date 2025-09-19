@@ -21,43 +21,6 @@ export function classifyMessage(messageText: string): ClassifiedMessage {
   // Quick checks for MCQ indicators
   const hasQuestionMark = text.includes('?');
   
-  // Pattern for detecting MCQ options (A., B., 1., 2., A), B), etc.)
-  const mcqPatterns = [
-    /^\s*([A-D]|[1-4])\.\s+(.+)$/gm,     // A. Option text
-    /^\s*([A-D]|[1-4])\)\s+(.+)$/gm,     // A) Option text  
-    /^\s*([A-D]|[1-4]):\s+(.+)$/gm,      // A: Option text
-    /^\s*•\s+(.+)$/gm,                   // • Option text (bullet points)
-    /^\s*-\s+(.+)$/gm,                   // - Option text (dashes)
-  ];
-  
-  // Try to find MCQ options using different patterns
-  let options: MCQOption[] = [];
-  let matchedPattern: RegExp | null = null;
-  
-  for (const pattern of mcqPatterns) {
-    const matches = Array.from(text.matchAll(pattern));
-    if (matches.length >= 2) { // Need at least 2 options for MCQ
-      matchedPattern = pattern;
-      
-      if (pattern.source.includes('([A-D]|[1-4])')) {
-        // Patterns with explicit labels
-        options = matches.map(match => ({
-          label: match[1].toUpperCase(),
-          text: match[2].trim(),
-          fullText: match[0].trim()
-        }));
-      } else {
-        // Bullet/dash patterns - generate labels
-        options = matches.map((match, index) => ({
-          label: String.fromCharCode(65 + index), // A, B, C, D
-          text: match[1].trim(),
-          fullText: match[0].trim()
-        }));
-      }
-      break;
-    }
-  }
-  
   // Additional heuristics for MCQ detection
   const mcqKeywords = [
     'choose the', 'select the', 'which of the following',
@@ -73,22 +36,96 @@ export function classifyMessage(messageText: string): ClassifiedMessage {
   // Additional pattern detection for scale/rating questions
   const hasScalePattern = /scale of \d+(-\d+)?|rate.*\d+-\d+/i.test(text);
   
-  // Determine if this is an MCQ
-  const isMCQ = hasQuestionMark && options.length >= 2 && (hasKeywords || matchedPattern || hasScalePattern);
+  // Only try to parse options if we have MCQ indicators
+  if (!hasQuestionMark || (!hasKeywords && !hasScalePattern)) {
+    return {
+      type: 'text',
+      originalText: text
+    };
+  }
   
-  if (isMCQ && options.length > 0) {
+  // Pattern for detecting MCQ options - prioritize numbered bullets
+  const numberedBulletPattern = /^\s*•\s+(\d+)\s*=\s*(.+)$/gm;
+  const letterBulletPattern = /^\s*•\s+([A-Z])\s*=\s*(.+)$/gm;
+  const simpleBulletPattern = /^\s*•\s+(.+)$/gm;
+  const numberedPattern = /^\s*([1-9]|10)\.\s+(.+)$/gm;
+  const lettersPattern = /^\s*([A-D])\.\s+(.+)$/gm;
+  
+  let options: MCQOption[] = [];
+  
+  // Try numbered bullets first (like your screenshot: • 1 = 'text')
+  let matches = Array.from(text.matchAll(numberedBulletPattern));
+  if (matches.length >= 2) {
+    options = matches.map(match => ({
+      label: match[1], // Use the number as label
+      text: match[2].trim().replace(/^['"]|['"]$/g, ''), // Remove surrounding quotes
+      fullText: match[0].trim()
+    }));
+  }
+  
+  // Try letter bullets (• A = 'text')
+  if (options.length === 0) {
+    matches = Array.from(text.matchAll(letterBulletPattern));
+    if (matches.length >= 2) {
+      options = matches.map(match => ({
+        label: match[1], 
+        text: match[2].trim().replace(/^['"]|['"]$/g, ''),
+        fullText: match[0].trim()
+      }));
+    }
+  }
+  
+  // Try simple numbered list (1. text)
+  if (options.length === 0) {
+    matches = Array.from(text.matchAll(numberedPattern));
+    if (matches.length >= 2) {
+      options = matches.map(match => ({
+        label: match[1],
+        text: match[2].trim(),
+        fullText: match[0].trim()
+      }));
+    }
+  }
+  
+  // Try letter list (A. text)
+  if (options.length === 0) {
+    matches = Array.from(text.matchAll(lettersPattern));
+    if (matches.length >= 2) {
+      options = matches.map(match => ({
+        label: match[1],
+        text: match[2].trim(),
+        fullText: match[0].trim()
+      }));
+    }
+  }
+  
+  // Try simple bullets (• text) as fallback
+  if (options.length === 0) {
+    matches = Array.from(text.matchAll(simpleBulletPattern));
+    if (matches.length >= 2) {
+      options = matches.map((match, index) => ({
+        label: String.fromCharCode(65 + index), // A, B, C, D
+        text: match[1].trim(),
+        fullText: match[0].trim()
+      }));
+    }
+  }
+  
+  // If we found enough options, return MCQ
+  if (options.length >= 2) {
     // Extract the stem (question part before options)
     const firstOptionIndex = text.indexOf(options[0].fullText);
-    const stem = text.substring(0, firstOptionIndex).trim();
+    const stem = firstOptionIndex > 0 ? text.substring(0, firstOptionIndex).trim() : text;
     
     return {
       type: 'mcq',
-      stem: stem || text, // Fallback to full text if can't extract stem
+      stem,
       options,
       originalText: text
     };
   }
   
+  // Default to text if no MCQ structure found
   return {
     type: 'text',
     originalText: text

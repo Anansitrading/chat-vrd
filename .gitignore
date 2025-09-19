@@ -56,3 +56,4 @@ coverage/
 
 # Desktop integration
 /tmp/kijko-app.pid
+.vercel
