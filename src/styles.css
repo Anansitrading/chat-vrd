@@ -1,0 +1,195 @@
+/* UI Overhaul - Dark Theme Variables & Animations */
+:root {
+  /* Core Color Palette */
+  --bg-main: #0D0D12;
+  --bg-bot: #1E1E28;
+  --bg-input: #1E1E28;
+  --text-primary: #FFFFFF;
+  --text-secondary: #FFFFFFD6;
+  
+  /* Gradients */
+  --gradient-user: linear-gradient(135deg, #FF2DBD 0%, #7D3CFD 100%);
+  --gradient-accent: linear-gradient(135deg, #CF30FF 0%, #FF2DBD 100%);
+  --gradient-send: linear-gradient(135deg, #7D3CFD 0%, #FF2DBD 100%);
+  
+  /* Layout & Spacing */
+  --radius-xl: 18px;
+  --radius-lg: 14px;
+  --radius-md: 12px;
+  --shadow-elev: 0 2px 6px #00000080;
+  --spacing-outer: 1.25rem;
+  --spacing-bubble: 0.9rem 1rem;
+  
+  /* Animation Timings */
+  --timing-fast: 150ms;
+  --timing-normal: 200ms;
+  --timing-slow: 300ms;
+}
+
+/* Global Styles */
+body {
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Custom Animations */
+@keyframes bounce-dots {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-6px); }
+  60% { transform: translateY(-3px); }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-press {
+  from { transform: scale(1); }
+  to { transform: scale(0.97); }
+}
+
+@keyframes glow-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(125, 60, 253, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(125, 60, 253, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(125, 60, 253, 0); }
+}
+
+/* Utility Classes */
+.gradient-user {
+  background: var(--gradient-user);
+}
+
+.gradient-accent {
+  background: var(--gradient-accent);
+}
+
+.gradient-send {
+  background: var(--gradient-send);
+}
+
+.animate-slide-up {
+  animation: slide-up var(--timing-fast) ease-out;
+}
+
+.animate-bounce-dots {
+  animation: bounce-dots 0.8s infinite;
+}
+
+.animate-scale-press {
+  animation: scale-press var(--timing-fast) ease-out;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s infinite;
+}
+
+/* Loading Dots */
+.loading-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.loading-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--text-secondary);
+  animation: bounce-dots 0.8s infinite;
+}
+
+.loading-dots .dot:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.loading-dots .dot:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-secondary);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-primary);
+}
+
+/* Focus States */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-opacity-50;
+}
+
+/* Gradient Text */
+.text-gradient {
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass Effect */
+.glass {
+  backdrop-filter: blur(10px);
+  background: rgba(30, 30, 40, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Button Hover Effects */
+.btn-interactive {
+  transition: all var(--timing-fast) ease;
+}
+
+.btn-interactive:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.btn-interactive:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Mobile Optimizations */
+@media (max-width: 640px) {
+  :root {
+    --spacing-outer: 1rem;
+    --spacing-bubble: 0.75rem 0.875rem;
+  }
+}
+
+/* High contrast for accessibility */
+@media (prefers-contrast: high) {
+  :root {
+    --text-secondary: #FFFFFF;
+    --bg-bot: #000000;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

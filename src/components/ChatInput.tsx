@@ -106,67 +106,109 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   }
 
   return (
-    <div className="p-4 md:p-6 bg-gray-900 border-t border-gray-700 flex-shrink-0">
-      <div className="bg-gray-800 rounded-2xl p-2 flex flex-col">
-        {attachments.length > 0 && (
-            <div className="p-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+    <div className="p-6 border-t border-white/10 flex-shrink-0" style={{ background: 'var(--bg-input)' }}>
+      <div className="relative">
+        {/* Composer Container */}
+        <div className="glass rounded-2xl border border-white/10 overflow-hidden">
+          {/* Attachments Preview */}
+          {attachments.length > 0 && (
+            <div className="p-4 border-b border-white/10">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {attachments.map((file, index) => (
-                    <div key={index} className="bg-gray-700 p-2 rounded-lg flex items-center justify-between text-sm">
-                        <span className="truncate" title={file.name}>{file.name}</span>
-                        <button onClick={() => removeAttachment(index)} className="ml-2 text-gray-400 hover:text-white">
-                            <XCircleIcon className="w-5 h-5" />
-                        </button>
-                    </div>
+                  <div key={index} className="bg-gray-700/50 p-3 rounded-xl flex items-center justify-between text-sm backdrop-blur">
+                    <span className="truncate text-white/90" title={file.name}>{file.name}</span>
+                    <button 
+                      onClick={() => removeAttachment(index)} 
+                      className="ml-2 text-gray-400 hover:text-red-400 transition-colors p-1 rounded-md hover:bg-red-500/10"
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      <XCircleIcon className="w-4 h-4" />
+                    </button>
+                  </div>
                 ))}
+              </div>
             </div>
-        )}
-        <div className="flex items-end">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-3 text-gray-400 hover:text-white transition-colors duration-200"
-            aria-label="Attach files"
-          >
-            <AttachmentIcon className="w-6 h-6" />
-          </button>
-          <button
-            onClick={handleMicClick}
-            disabled={!isSttSupported}
-            className={`p-3 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${isListening ? 'text-red-500 animate-pulse' : 'text-gray-400 hover:text-white'}`}
-            aria-label={isListening ? 'Stop listening' : 'Start listening'}
-            title={isSttSupported ? (isListening ? 'Stop listening' : 'Start listening') : 'Speech-to-text is not supported in your browser'}
-          >
-            <MicrophoneIcon className="w-6 h-6" />
-          </button>
-          <input
-            type="file"
-            multiple
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            className="hidden"
-            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
-          />
-          <textarea
-            ref={textAreaRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isListening ? "Listening..." : "Tell me about your video idea..."}
-            className="flex-1 bg-transparent p-3 resize-none outline-none placeholder-gray-500 max-h-40"
-            rows={1}
-            disabled={isLoading}
-          />
-          <button
-            onClick={handleSendMessage}
-            disabled={isLoading || (!text.trim() && attachments.length === 0)}
-            className="p-3 rounded-full bg-indigo-500 text-white disabled:bg-gray-600 disabled:cursor-not-allowed hover:bg-indigo-600 transition-colors duration-200"
-            aria-label="Send message"
-          >
-            {isLoading ? (
-                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-                <SendIcon className="w-6 h-6" />
-            )}
-          </button>
+          )}
+          
+          {/* Input Row */}
+          <div className="flex items-end p-2">
+            {/* Attachment Button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-3 text-gray-400 hover:text-white transition-all duration-200 rounded-lg hover:bg-white/5 focus-ring"
+              aria-label="Attach files"
+              title="Attach files"
+            >
+              <AttachmentIcon className="w-5 h-5" />
+            </button>
+            
+            {/* Microphone Button */}
+            <button
+              onClick={handleMicClick}
+              disabled={!isSttSupported}
+              className={`
+                p-3 transition-all duration-200 rounded-lg focus-ring
+                disabled:opacity-50 disabled:cursor-not-allowed
+                ${isListening 
+                  ? 'text-red-400 bg-red-500/10 animate-glow-pulse' 
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }
+              `}
+              aria-label={isListening ? 'Stop listening' : 'Start listening'}
+              title={isSttSupported ? (isListening ? 'Stop listening' : 'Start listening') : 'Speech-to-text is not supported in your browser'}
+            >
+              <MicrophoneIcon className="w-5 h-5" />
+            </button>
+            
+            {/* Hidden File Input */}
+            <input
+              type="file"
+              multiple
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
+            />
+            
+            {/* Text Input */}
+            <textarea
+              ref={textAreaRef}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isListening ? "🎤 Listening..." : "Send message..."}
+              className={`
+                flex-1 bg-transparent p-3 resize-none outline-none max-h-40
+                text-white placeholder:text-gray-500
+                ${isListening ? 'placeholder:animate-pulse' : ''}
+              `}
+              rows={1}
+              disabled={isLoading}
+            />
+            
+            {/* Send Button */}
+            <button
+              onClick={handleSendMessage}
+              disabled={isLoading || (!text.trim() && attachments.length === 0)}
+              className={`
+                p-3 rounded-xl transition-all duration-200 focus-ring
+                ${isLoading || (!text.trim() && attachments.length === 0)
+                  ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                  : 'gradient-send text-white shadow-lg btn-interactive hover:shadow-xl'
+                }
+              `}
+              aria-label="Send message"
+              title="Send message"
+            >
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
