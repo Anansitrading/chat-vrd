@@ -44,71 +44,28 @@ export function classifyMessage(messageText: string): ClassifiedMessage {
     };
   }
   
-  // Pattern for detecting MCQ options - prioritize numbered bullets
-  const numberedBulletPattern = /^\s*•\s+(\d+)\s*=\s*(.+)$/gm;
-  const letterBulletPattern = /^\s*•\s+([A-Z])\s*=\s*(.+)$/gm;
-  const simpleBulletPattern = /^\s*•\s+(.+)$/gm;
-  const numberedPattern = /^\s*([1-9]|10)\.\s+(.+)$/gm;
-  const lettersPattern = /^\s*([A-D])\.\s+(.+)$/gm;
+  // Normalize text to handle different bullet types and quotes
+  const safeText = text
+    // Replace curly/smart quotes with standard quotes
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    // Normalize bullets to consistent bullet point
+    .replace(/[•‣◦⁃∙]/g, "•");
+  
+  // Robust pattern for MCQ options that handles flexible whitespace, quotes, and bullets
+  const mcqBulletPattern = /^[\s\t]*[•\-*●‣][\s\t]*(\d+)[\s\t]*=[\s\t]*['"‘’“”]?(.+?)['"‘’“”]?\s*$/gmi;
   
   let options: MCQOption[] = [];
+  let match: RegExpExecArray | null;
   
-  // Try numbered bullets first (like your screenshot: • 1 = 'text')
-  let matches = Array.from(text.matchAll(numberedBulletPattern));
-  if (matches.length >= 2) {
-    options = matches.map(match => ({
-      label: match[1], // Use the number as label
-      text: match[2].trim().replace(/^['"]|['"]$/g, ''), // Remove surrounding quotes
-      fullText: match[0].trim()
-    }));
+  // Extract all MCQ options using the robust pattern
+  while ((match = mcqBulletPattern.exec(safeText)) !== null) {
+    options.push({
+      label: match[1], // The number (1, 5, 10, etc.)
+      text: match[2].trim(), // The option text
+      fullText: match[0].trim() // The full match
+    });
   }
-  
-  // Try letter bullets (• A = 'text')
-  if (options.length === 0) {
-    matches = Array.from(text.matchAll(letterBulletPattern));
-    if (matches.length >= 2) {
-      options = matches.map(match => ({
-        label: match[1], 
-        text: match[2].trim().replace(/^['"]|['"]$/g, ''),
-        fullText: match[0].trim()
-      }));
-    }
-  }
-  
-  // Try simple numbered list (1. text)
-  if (options.length === 0) {
-    matches = Array.from(text.matchAll(numberedPattern));
-    if (matches.length >= 2) {
-      options = matches.map(match => ({
-        label: match[1],
-        text: match[2].trim(),
-        fullText: match[0].trim()
-      }));
-    }
-  }
-  
-  // Try letter list (A. text)
-  if (options.length === 0) {
-    matches = Array.from(text.matchAll(lettersPattern));
-    if (matches.length >= 2) {
-      options = matches.map(match => ({
-        label: match[1],
-        text: match[2].trim(),
-        fullText: match[0].trim()
-      }));
-    }
-  }
-  
-  // Try simple bullets (• text) as fallback
-  if (options.length === 0) {
-    matches = Array.from(text.matchAll(simpleBulletPattern));
-    if (matches.length >= 2) {
-      options = matches.map((match, index) => ({
-        label: String.fromCharCode(65 + index), // A, B, C, D
-        text: match[1].trim(),
-        fullText: match[0].trim()
-      }));
-    }
   }
   
   // If we found enough options, return MCQ
