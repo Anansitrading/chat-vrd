@@ -1,5 +1,7 @@
 # Chat VRD - Video Requirements Document Assistant
 
+<!-- Vercel GitHub integration test -->
+
 A multimodal, speech-enabled AI assistant built with React 19, TypeScript, and Vite that helps users create comprehensive Video Requirements Documents (VRDs) through an adaptive discovery process.
 
 ## 🚀 Features
