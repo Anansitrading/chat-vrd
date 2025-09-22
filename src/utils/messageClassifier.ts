@@ -136,35 +136,26 @@ export function formatOptionText(text: string): string {
  * Handles various formats like "1 = 'text'", "A) text", "1. text", etc.
  */
 export function extractMCQOptions(messageText: string): MCQOption[] {
+  // Debug logging
+  console.log('🔍 extractMCQOptions called with:', JSON.stringify(messageText));
+  
   const options: MCQOption[] = [];
   
-  // Pattern 1: Number = 'text' or Number = "text" (e.g., 1 = 'I just know...')
-  const pattern1 = /^\s*(\d+)\s*=\s*['"]([^'"]+)['"]\s*$/gm;
+  // Normalize line endings to handle browser/Node.js differences
+  const normalizedText = messageText.replace(/\r\n|\r/g, '\n');
+  console.log('📝 Normalized text:', JSON.stringify(normalizedText));
   
-  // Pattern 2: Number. text or Number: text (e.g., 1. Option text)
-  const pattern2 = /^\s*(\d+)[.:]\s+(.+)$/gm;
+  // Split into lines and process each line individually
+  const lines = normalizedText.split('\n');
+  console.log('📋 Lines:', lines);
   
-  // Pattern 3: Letter) text or Letter. text or Letter: text (e.g., A) Option text)
-  const pattern3 = /^\s*([A-Z])[).:]\s+(.+)$/gm;
+  // Pattern for Number = 'text' format
+  const pattern = /^\s*(\d+)\s*=\s*['"]([^'"]+)['"]\s*$/;
   
-  // Pattern 4: Bullet with number (e.g., • 1 = 'text')
-  const pattern4 = /^\s*[•●◦▪▫◆■□-]\s*(\d+)\s*=\s*['"]?([^'"\n]+)['"]?\s*$/gm;
-  
-  // Try each pattern and collect matches
-  let match;
-  
-  // Try pattern 1 first (Number = 'text')
-  while ((match = pattern1.exec(messageText)) !== null) {
-    options.push({
-      label: match[1],
-      text: match[2].trim(),
-      fullText: match[0].trim()
-    });
-  }
-  
-  // If no matches, try pattern 2 (Number. text)
-  if (options.length === 0) {
-    while ((match = pattern2.exec(messageText)) !== null) {
+  for (const line of lines) {
+    const match = pattern.exec(line.trim());
+    if (match) {
+      console.log('✅ Found match:', match);
       options.push({
         label: match[1],
         text: match[2].trim(),
@@ -173,27 +164,25 @@ export function extractMCQOptions(messageText: string): MCQOption[] {
     }
   }
   
-  // If no matches, try pattern 3 (Letter) text)
+  // If no = format found, try other patterns
   if (options.length === 0) {
-    while ((match = pattern3.exec(messageText)) !== null) {
-      options.push({
-        label: match[1],
-        text: match[2].trim(),
-        fullText: match[0].trim()
-      });
+    // Pattern for Number. text or Number: text
+    const pattern2 = /^\s*(\d+)[.:]\s+(.+)$/;
+    
+    for (const line of lines) {
+      const match = pattern2.exec(line.trim());
+      if (match) {
+        console.log('✅ Found pattern2 match:', match);
+        options.push({
+          label: match[1],
+          text: match[2].trim(),
+          fullText: match[0].trim()
+        });
+      }
     }
   }
   
-  // If no matches, try pattern 4 (Bullet with number)
-  if (options.length === 0) {
-    while ((match = pattern4.exec(messageText)) !== null) {
-      options.push({
-        label: match[1],
-        text: match[2].trim(),
-        fullText: match[0].trim()
-      });
-    }
-  }
+  console.log('🎯 Final extracted options:', options);
   
   // Only return options if we found at least 2 (to avoid false positives)
   return options.length >= 2 ? options : [];
