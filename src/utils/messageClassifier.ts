@@ -130,3 +130,46 @@ export function formatOptionText(text: string): string {
     .replace(/^\w/, (c) => c.toUpperCase()) // Capitalize first letter
     .replace(/\.$/, ''); // Remove trailing period if present
 }
+
+/**
+ * Generate default MCQ options based on message content
+ * This ensures ALL assistant messages have interactive options
+ */
+export function generateDefaultMCQOptions(messageText: string): MCQOption[] {
+  // Common assistant response patterns that should have options
+  const defaultOptions: MCQOption[] = [];
+  
+  // Check for clarification/follow-up patterns
+  if (messageText.toLowerCase().includes('would you like') || 
+      messageText.toLowerCase().includes('shall i') ||
+      messageText.toLowerCase().includes('should we') ||
+      messageText.toLowerCase().includes('do you want')) {
+    defaultOptions.push(
+      { label: 'A', text: 'Yes, let\'s do that', fullText: 'A. Yes, let\'s do that' },
+      { label: 'B', text: 'No, let\'s try something else', fullText: 'B. No, let\'s try something else' },
+      { label: 'C', text: 'I need more information first', fullText: 'C. I need more information first' }
+    );
+  }
+  // Check for next steps patterns  
+  else if (messageText.toLowerCase().includes('next') ||
+           messageText.toLowerCase().includes('now') ||
+           messageText.toLowerCase().includes('let\'s')) {
+    defaultOptions.push(
+      { label: 'A', text: 'Continue with this approach', fullText: 'A. Continue with this approach' },
+      { label: 'B', text: 'Explore alternatives', fullText: 'B. Explore alternatives' },
+      { label: 'C', text: 'Tell me more about this', fullText: 'C. Tell me more about this' },
+      { label: 'D', text: 'Go back to previous topic', fullText: 'D. Go back to previous topic' }
+    );
+  }
+  // Default options for any response
+  else {
+    defaultOptions.push(
+      { label: 'A', text: 'Tell me more', fullText: 'A. Tell me more' },
+      { label: 'B', text: 'Let\'s move on', fullText: 'B. Let\'s move on' },
+      { label: 'C', text: 'Can you clarify that?', fullText: 'C. Can you clarify that?' },
+      { label: 'D', text: 'I have a different question', fullText: 'D. I have a different question' }
+    );
+  }
+  
+  return defaultOptions;
+}

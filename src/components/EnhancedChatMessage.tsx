@@ -9,7 +9,7 @@ import {
   ArrowPathIcon 
 } from '@heroicons/react/24/outline';
 import { UIMessage } from '../types';
-import { classifyMessage, stripMarkdownForTTS, MCQOption } from '../utils/messageClassifier';
+import { classifyMessage, stripMarkdownForTTS, MCQOption, generateDefaultMCQOptions } from '../utils/messageClassifier';
 import OptionGroup from './OptionGroup';
 
 interface EnhancedChatMessageProps {
@@ -191,38 +191,32 @@ const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
             <div className="whitespace-pre-wrap break-words">
               {message.text}
             </div>
-          ) : classifiedMessage.type === 'mcq' ? (
-            // MCQ messages: render stem + options
+          ) : (
+            // All assistant messages get MCQ options by default
             <div>
               <div className="mb-2">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={markdownComponents}
+                <div 
+                  className="prose prose-invert prose-sm max-w-none"
+                  aria-live={isStreaming ? 'polite' : undefined}
                 >
-                  {classifiedMessage.stem || ''}
-                </ReactMarkdown>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={markdownComponents}
+                  >
+                    {classifiedMessage.type === 'mcq' ? (classifiedMessage.stem || '') : message.text}
+                  </ReactMarkdown>
+                </div>
               </div>
               
-              {classifiedMessage.options && !isStreaming && (
+              {!isStreaming && (
                 <OptionGroup
-                  options={classifiedMessage.options}
+                  options={classifiedMessage.type === 'mcq' && classifiedMessage.options 
+                    ? classifiedMessage.options 
+                    : generateDefaultMCQOptions(message.text)}
                   onSelect={handleOptionSelect}
                   disabled={!onOptionSelect}
                 />
               )}
-            </div>
-          ) : (
-            // Regular assistant messages: markdown rendering
-            <div 
-              className="prose prose-invert prose-sm max-w-none"
-              aria-live={isStreaming ? 'polite' : undefined}
-            >
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={markdownComponents}
-              >
-                {message.text}
-              </ReactMarkdown>
             </div>
           )}
 
