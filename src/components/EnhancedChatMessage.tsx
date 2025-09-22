@@ -203,16 +203,14 @@ const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
                     remarkPlugins={[remarkGfm]}
                     components={markdownComponents}
                   >
-                    {classifiedMessage.type === 'mcq' ? (classifiedMessage.stem || '') : message.text}
+                    {message.text}
                   </ReactMarkdown>
                 </div>
               </div>
               
               {!isStreaming && (
                 <OptionGroup
-                  options={classifiedMessage.type === 'mcq' && classifiedMessage.options 
-                    ? classifiedMessage.options 
-                    : generateDefaultMCQOptions(message.text)}
+                  options={generateDefaultMCQOptions(message.text)}
                   onSelect={handleOptionSelect}
                   disabled={!onOptionSelect}
                 />
