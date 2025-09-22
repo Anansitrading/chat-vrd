@@ -136,55 +136,60 @@ export function formatOptionText(text: string): string {
  * Handles various formats like "1 = 'text'", "A) text", "1. text", etc.
  */
 export function extractMCQOptions(messageText: string): MCQOption[] {
-  // Debug logging
-  console.log('🔍 extractMCQOptions called with:', JSON.stringify(messageText));
-  
+  // Normalize line endings first
+  let normalizedText = messageText.replace(/\r\n|\r/g, '\n');
+
+  // Helper to sanitize each line for robust matching across browsers
+  const sanitize = (line: string) => {
+    return line
+      // convert various unicode spaces to regular space
+      .replace(/[\u00A0\u1680\u180E\u2000-\u200B\u202F\u205F\u3000]/g, ' ')
+      // normalize smart quotes to straight quotes
+      .replace(/[‘’‚‛❛❟⸂⸃＇]/g, "'")
+      .replace(/[“”„‟❝❞〝〞＂]/g, '"')
+      // remove leading bullets/dashes
+      .replace(/^[•–—\-▪●*]+\s*/, '')
+      // collapse spaces
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   const options: MCQOption[] = [];
-  
-  // Normalize line endings to handle browser/Node.js differences
-  const normalizedText = messageText.replace(/\r\n|\r/g, '\n');
-  console.log('📝 Normalized text:', JSON.stringify(normalizedText));
-  
-  // Split into lines and process each line individually
   const lines = normalizedText.split('\n');
-  console.log('📋 Lines:', lines);
-  
-  // Pattern for Number = 'text' format
-  const pattern = /^\s*(\d+)\s*=\s*['"]([^'"]+)['"]\s*$/;
-  
-  for (const line of lines) {
-    const match = pattern.exec(line.trim());
-    if (match) {
-      console.log('✅ Found match:', match);
-      options.push({
-        label: match[1],
-        text: match[2].trim(),
-        fullText: match[0].trim()
-      });
+
+  // 1) Try explicit numbered options: 1 = 'text' | 1. text | 1: text
+  const eqPattern = /^(\d+)\s*=\s*["']([^"']+)["']\s*$/;
+  const dotPattern = /^(\d+)[\.:]\s+(.+)$/;
+
+  for (const raw of lines) {
+    const line = sanitize(raw);
+    let m = eqPattern.exec(line);
+    if (m) {
+      options.push({ label: m[1], text: m[2].trim(), fullText: line });
+      continue;
+    }
+    m = dotPattern.exec(line);
+    if (m) {
+      options.push({ label: m[1], text: m[2].trim(), fullText: line });
     }
   }
-  
-  // If no = format found, try other patterns
-  if (options.length === 0) {
-    // Pattern for Number. text or Number: text
-    const pattern2 = /^\s*(\d+)[.:]\s+(.+)$/;
-    
-    for (const line of lines) {
-      const match = pattern2.exec(line.trim());
-      if (match) {
-        console.log('✅ Found pattern2 match:', match);
-        options.push({
-          label: match[1],
-          text: match[2].trim(),
-          fullText: match[0].trim()
-        });
+
+  // 2) If still nothing, detect scale prompts (rate/scale X-Y) and generate range
+  if (options.length < 2) {
+    const scaleMatch = normalizedText
+      .replace(/[–—]/g, '-') // normalize dashes
+      .match(/(?:rate|scale)[^\d]*(\d+)\s*[-to]{1,3}\s*(\d+)/i);
+    if (scaleMatch) {
+      const start = parseInt(scaleMatch[1], 10);
+      const end = parseInt(scaleMatch[2], 10);
+      if (!isNaN(start) && !isNaN(end) && end >= start) {
+        for (let i = start; i <= end; i++) {
+          options.push({ label: String(i), text: String(i), fullText: String(i) });
+        }
       }
     }
   }
-  
-  console.log('🎯 Final extracted options:', options);
-  
-  // Only return options if we found at least 2 (to avoid false positives)
+
   return options.length >= 2 ? options : [];
 }
 
