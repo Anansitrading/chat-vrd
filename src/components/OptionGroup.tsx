@@ -1,39 +1,49 @@
 import React, { useState, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { MCQOption } from '../utils/messageClassifier';
 
 interface OptionGroupProps {
   options: MCQOption[];
   onSelect: (option: MCQOption) => void;
+  onSubmit?: (selectedOptions: MCQOption[]) => void;
   disabled?: boolean;
   short?: boolean;
+  allowMultiple?: boolean;
 }
 
 interface OptionButtonProps {
   option: MCQOption;
-  onSelect: (option: MCQOption) => void;
+  onToggle: (option: MCQOption) => void;
   disabled?: boolean;
   selected?: boolean;
+  allowMultiple?: boolean;
 }
 
 interface OptionRowProps {
   option: MCQOption;
-  onSelect: (option: MCQOption) => void;
+  onToggle: (option: MCQOption) => void;
   disabled?: boolean;
   selected?: boolean;
+  allowMultiple?: boolean;
 }
 
-const OptionButton: React.FC<OptionButtonProps> = ({ option, onSelect, disabled = false, selected = false }) => {
+const OptionButton: React.FC<OptionButtonProps> = ({ option, onToggle, disabled = false, selected = false, allowMultiple = false }) => {
   const [isPressed, setIsPressed] = useState(false);
 
   const handleClick = useCallback(() => {
     if (!disabled) {
-      onSelect(option);
+      onToggle(option);
     }
-  }, [option, onSelect, disabled]);
+  }, [option, onToggle, disabled]);
 
   const handleMouseDown = () => setIsPressed(true);
   const handleMouseUp = () => setIsPressed(false);
   const handleMouseLeave = () => setIsPressed(false);
+
+  // Strip markdown for clean text extraction
+  const stripMarkdown = (text: string) => {
+    return text.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
+  };
 
   return (
     <button
@@ -45,7 +55,7 @@ const OptionButton: React.FC<OptionButtonProps> = ({ option, onSelect, disabled 
       className={`
         w-full text-left px-4 py-3 rounded-xl font-medium text-white
         transition-all duration-150 ease-out
-        btn-interactive focus-ring
+        btn-interactive focus-ring flex items-center
         ${selected 
           ? 'gradient-user shadow-lg transform scale-[0.98]' 
           : disabled 
@@ -55,20 +65,49 @@ const OptionButton: React.FC<OptionButtonProps> = ({ option, onSelect, disabled 
         ${isPressed ? 'animate-glow-pulse' : ''}
       `}
       aria-pressed={selected}
-      role="button"
+      role={allowMultiple ? 'checkbox' : 'button'}
+      aria-checked={allowMultiple ? selected : undefined}
     >
-      <span className="text-sm opacity-90">{option.label}.</span>
-      <span className="ml-2">{option.text}</span>
+      {allowMultiple && (
+        <div className={`
+          w-5 h-5 rounded border-2 flex items-center justify-center mr-3 flex-shrink-0
+          transition-all duration-200
+          ${selected 
+            ? 'border-white bg-white' 
+            : 'border-gray-400'
+          }
+        `}>
+          {selected && (
+            <svg className="w-3 h-3 text-gray-800" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          )}
+        </div>
+      )}
+      <div className="flex-1">
+        <span className="text-sm opacity-90">{option.label}.</span>
+        <span className="ml-2">
+          <ReactMarkdown 
+            components={{ 
+              p: React.Fragment,
+              strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+              em: ({ children }) => <em className="italic">{children}</em>
+            }}
+          >
+            {option.text}
+          </ReactMarkdown>
+        </span>
+      </div>
     </button>
   );
 };
 
-const OptionRow: React.FC<OptionRowProps> = ({ option, onSelect, disabled = false, selected = false }) => {
+const OptionRow: React.FC<OptionRowProps> = ({ option, onToggle, disabled = false, selected = false, allowMultiple = false }) => {
   const handleClick = useCallback(() => {
     if (!disabled) {
-      onSelect(option);
+      onToggle(option);
     }
-  }, [option, onSelect, disabled]);
+  }, [option, onToggle, disabled]);
 
   return (
     <button
@@ -86,7 +125,7 @@ const OptionRow: React.FC<OptionRowProps> = ({ option, onSelect, disabled = fals
         }
       `}
       aria-checked={selected}
-      role="radio"
+      role={allowMultiple ? 'checkbox' : 'radio'}
     >
       <div className="flex items-center space-x-4 flex-1">
         <div className={`
@@ -95,48 +134,123 @@ const OptionRow: React.FC<OptionRowProps> = ({ option, onSelect, disabled = fals
         `}>
           {option.label}
         </div>
-        <span className="text-left text-white/90 flex-1">{option.text}</span>
+        <span className="text-left text-white/90 flex-1">
+          <ReactMarkdown 
+            components={{ 
+              p: React.Fragment,
+              strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+              em: ({ children }) => <em className="italic">{children}</em>
+            }}
+          >
+            {option.text}
+          </ReactMarkdown>
+        </span>
       </div>
       
-      <div className={`
-        w-5 h-5 rounded-full border-2 flex items-center justify-center
-        transition-all duration-200
-        ${selected 
-          ? 'border-purple-400 bg-purple-400' 
-          : 'border-gray-500'
-        }
-      `}>
-        {selected && (
-          <div className="w-2 h-2 bg-white rounded-full animate-scale-press" />
-        )}
-      </div>
+      {allowMultiple ? (
+        <div className={`
+          w-5 h-5 rounded border-2 flex items-center justify-center
+          transition-all duration-200
+          ${selected 
+            ? 'border-purple-400 bg-purple-400' 
+            : 'border-gray-500'
+          }
+        `}>
+          {selected && (
+            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          )}
+        </div>
+      ) : (
+        <div className={`
+          w-5 h-5 rounded-full border-2 flex items-center justify-center
+          transition-all duration-200
+          ${selected 
+            ? 'border-purple-400 bg-purple-400' 
+            : 'border-gray-500'
+          }
+        `}>
+          {selected && (
+            <div className="w-2 h-2 bg-white rounded-full animate-scale-press" />
+          )}
+        </div>
+      )}
     </button>
   );
 };
 
 export const OptionGroup: React.FC<OptionGroupProps> = ({ 
   options, 
-  onSelect, 
+  onSelect,
+  onSubmit,
   disabled = false, 
-  short 
+  short,
+  allowMultiple = false
 }) => {
-  const [selectedOption, setSelectedOption] = useState<MCQOption | null>(null);
+  const [selectedOptions, setSelectedOptions] = useState<MCQOption[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Determine if this should be multi-select based on content
+  const shouldAllowMultiple = allowMultiple || options.some(opt => 
+    opt.text.toLowerCase().includes('energetic') || 
+    opt.text.toLowerCase().includes('mysterious') ||
+    opt.text.toLowerCase().includes('style') ||
+    opt.text.toLowerCase().includes('tone')
+  );
 
   // Determine layout based on option length or explicit short prop
   const isShortLayout = short ?? options.every(option => option.text.length <= 30);
 
-  const handleSelect = useCallback((option: MCQOption) => {
-    if (!disabled) {
-      setSelectedOption(option);
-      // Small delay to show selection before calling onSelect
+  const handleToggle = useCallback((option: MCQOption) => {
+    if (disabled) return;
+
+    if (shouldAllowMultiple) {
+      setSelectedOptions(prev => 
+        prev.find(opt => opt.label === option.label)
+          ? prev.filter(opt => opt.label !== option.label)
+          : [...prev, option]
+      );
+    } else {
+      // Single select - immediate submission
+      setSelectedOptions([option]);
+      setIsProcessing(true);
       setTimeout(() => {
         onSelect(option);
+        setIsProcessing(false);
       }, 150);
     }
-  }, [onSelect, disabled]);
+  }, [onSelect, disabled, shouldAllowMultiple]);
+
+  const handleSubmit = useCallback(() => {
+    if (selectedOptions.length > 0) {
+      setIsProcessing(true);
+      if (onSubmit) {
+        onSubmit(selectedOptions);
+      } else {
+        // For single callback, submit first option or combined text
+        const combinedOption: MCQOption = {
+          label: selectedOptions.map(opt => opt.label).join(','),
+          text: selectedOptions.map(opt => opt.text).join('; '),
+          fullText: selectedOptions.map(opt => opt.fullText).join('; ')
+        };
+        onSelect(combinedOption);
+      }
+      setTimeout(() => setIsProcessing(false), 150);
+    }
+  }, [selectedOptions, onSelect, onSubmit]);
 
   return (
     <div className="mt-4 space-y-3 animate-slide-up">
+      {shouldAllowMultiple && (
+        <div className="text-sm text-gray-400 mb-3 flex items-center">
+          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          Select all that apply, or enter your custom answer below
+        </div>
+      )}
+      
       {isShortLayout ? (
         // Short layout: Full-width gradient buttons
         <div className="space-y-2">
@@ -144,29 +258,50 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
             <OptionButton
               key={option.label}
               option={option}
-              onSelect={handleSelect}
+              onToggle={handleToggle}
               disabled={disabled}
-              selected={selectedOption?.label === option.label}
+              selected={selectedOptions.some(opt => opt.label === option.label)}
+              allowMultiple={shouldAllowMultiple}
             />
           ))}
         </div>
       ) : (
-        // Long layout: Vertical list with radio buttons
-        <div className="space-y-3" role="radiogroup" aria-label="Multiple choice options">
+        // Long layout: Vertical list with checkboxes/radio buttons
+        <div className="space-y-3" role={shouldAllowMultiple ? 'group' : 'radiogroup'} aria-label="Multiple choice options">
           {options.map((option) => (
             <OptionRow
               key={option.label}
               option={option}
-              onSelect={handleSelect}
+              onToggle={handleToggle}
               disabled={disabled}
-              selected={selectedOption?.label === option.label}
+              selected={selectedOptions.some(opt => opt.label === option.label)}
+              allowMultiple={shouldAllowMultiple}
             />
           ))}
         </div>
       )}
       
-      {/* Loading state when option is selected */}
-      {selectedOption && (
+      {/* Submit button for multi-select */}
+      {shouldAllowMultiple && selectedOptions.length > 0 && (
+        <div className="pt-3">
+          <button
+            onClick={handleSubmit}
+            disabled={disabled || isProcessing}
+            className="
+              w-full px-4 py-3 rounded-xl font-medium text-white
+              bg-blue-600 hover:bg-blue-700 active:scale-[0.98]
+              transition-all duration-150 ease-out
+              btn-interactive focus-ring
+              disabled:opacity-50 disabled:cursor-not-allowed
+            "
+          >
+            {isProcessing ? 'Processing...' : `Continue with ${selectedOptions.length} selection${selectedOptions.length !== 1 ? 's' : ''}`}
+          </button>
+        </div>
+      )}
+      
+      {/* Loading state for single select */}
+      {!shouldAllowMultiple && isProcessing && (
         <div className="flex items-center justify-center pt-2">
           <div className="loading-dots">
             <div className="dot"></div>
