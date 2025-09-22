@@ -8,6 +8,7 @@ Chat VRD is a multimodal, speech-enabled Video Brief Assistant built with React 
 
 ### Key Features
 - **Multimodal Chat Interface**: Text input with file attachments (images, videos, audio, documents)
+- **Enhanced MCQ System**: Multi-select options with markdown rendering and auto-detection
 - **Text-to-Speech**: Built-in speech synthesis for AI responses
 - **Adaptive Discovery**: Adjusts guidance level based on user expertise (1-10 clarity scale)
 - **YouTube Integration**: Automatic video URL detection and content analysis
@@ -72,7 +73,15 @@ User Input → ChatInput → App (state management) → GeminiService → Stream
 - **Attachment processing** converts files to base64 for AI analysis
 - **YouTube URL detection** automatically analyzes video content
 
-#### 3. Desktop Integration System
+#### 3. Enhanced MCQ System
+- **Markdown Rendering**: Uses `react-markdown` to properly display **bold** and *italic* text
+- **Multi-Select Capability**: Checkbox-style options with array-based state management
+- **Auto-Detection**: Intelligent detection of multi-select scenarios based on content keywords
+- **Visual Indicators**: Clear checkboxes for multi-select, radio buttons for single-select
+- **Accessibility**: Full ARIA support with proper roles and keyboard navigation
+- **Testing Interface**: Comprehensive demo at `/mcq-test` route
+
+#### 4. Desktop Integration System
 - **Process management** via shell scripts with PID tracking
 - **Port management** automatically handles 5173, 3000, 4173, 8080
 - **Signal-based shutdown** using file-based communication
@@ -84,7 +93,9 @@ User Input → ChatInput → App (state management) → GeminiService → Stream
 - `components/`: Modular React components with single responsibilities
   - `ChatHistory.tsx`: Auto-scrolling message display
   - `ChatInput.tsx`: File upload + text input with validation
-  - `ChatMessage.tsx`: Individual message rendering
+  - `EnhancedChatMessage.tsx`: Individual message rendering with MCQ integration
+  - `OptionGroup.tsx`: Advanced MCQ system with multi-select and markdown support
+  - `MCQTestDemo.tsx`: Comprehensive MCQ testing interface
   - `Header.tsx`: TTS controls and branding
   - `icons/`: UI icon components (SpeakerIcons, AttachmentIcon, SendIcon, FileIcons)
 
@@ -174,6 +185,9 @@ lsof -i :5173
 
 # Test build locally
 npm run build
+
+# Test MCQ system enhancements
+# Visit /mcq-test route to test multi-select and markdown rendering
 
 # Verify environment
 node --version && npm --version
