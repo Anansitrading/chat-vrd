@@ -9,7 +9,7 @@ import {
   ArrowPathIcon 
 } from '@heroicons/react/24/outline';
 import { UIMessage } from '../types';
-import { classifyMessage, stripMarkdownForTTS, MCQOption, generateDefaultMCQOptions } from '../utils/messageClassifier';
+import { classifyMessage, stripMarkdownForTTS, MCQOption, generateDefaultMCQOptions, extractMCQOptions } from '../utils/messageClassifier';
 import OptionGroup from './OptionGroup';
 
 interface EnhancedChatMessageProps {

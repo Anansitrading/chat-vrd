@@ -132,11 +132,85 @@ export function formatOptionText(text: string): string {
 }
 
 /**
+ * Extract MCQ options that are already present in the message
+ * Handles various formats like "1 = 'text'", "A) text", "1. text", etc.
+ */
+export function extractMCQOptions(messageText: string): MCQOption[] {
+  const options: MCQOption[] = [];
+  
+  // Pattern 1: Number = 'text' or Number = "text" (e.g., 1 = 'I just know...')
+  const pattern1 = /^\s*(\d+)\s*=\s*['"]([^'"]+)['"]\s*$/gm;
+  
+  // Pattern 2: Number. text or Number: text (e.g., 1. Option text)
+  const pattern2 = /^\s*(\d+)[.:]\s+(.+)$/gm;
+  
+  // Pattern 3: Letter) text or Letter. text or Letter: text (e.g., A) Option text)
+  const pattern3 = /^\s*([A-Z])[).:]\s+(.+)$/gm;
+  
+  // Pattern 4: Bullet with number (e.g., • 1 = 'text')
+  const pattern4 = /^\s*[•●◦▪▫◆■□-]\s*(\d+)\s*=\s*['"]?([^'"\n]+)['"]?\s*$/gm;
+  
+  // Try each pattern and collect matches
+  let match;
+  
+  // Try pattern 1 first (Number = 'text')
+  while ((match = pattern1.exec(messageText)) !== null) {
+    options.push({
+      label: match[1],
+      text: match[2].trim(),
+      fullText: match[0].trim()
+    });
+  }
+  
+  // If no matches, try pattern 2 (Number. text)
+  if (options.length === 0) {
+    while ((match = pattern2.exec(messageText)) !== null) {
+      options.push({
+        label: match[1],
+        text: match[2].trim(),
+        fullText: match[0].trim()
+      });
+    }
+  }
+  
+  // If no matches, try pattern 3 (Letter) text)
+  if (options.length === 0) {
+    while ((match = pattern3.exec(messageText)) !== null) {
+      options.push({
+        label: match[1],
+        text: match[2].trim(),
+        fullText: match[0].trim()
+      });
+    }
+  }
+  
+  // If no matches, try pattern 4 (Bullet with number)
+  if (options.length === 0) {
+    while ((match = pattern4.exec(messageText)) !== null) {
+      options.push({
+        label: match[1],
+        text: match[2].trim(),
+        fullText: match[0].trim()
+      });
+    }
+  }
+  
+  // Only return options if we found at least 2 (to avoid false positives)
+  return options.length >= 2 ? options : [];
+}
+
+/**
  * Generate default MCQ options based on message content
  * This ensures ALL assistant messages have interactive options
  */
 export function generateDefaultMCQOptions(messageText: string): MCQOption[] {
-  // Common assistant response patterns that should have options
+  // First try to extract options from the message itself
+  const extractedOptions = extractMCQOptions(messageText);
+  if (extractedOptions.length > 0) {
+    return extractedOptions;
+  }
+  
+  // If no options found in message, generate contextual fallback options
   const defaultOptions: MCQOption[] = [];
   
   // Check for clarification/follow-up patterns
