@@ -203,32 +203,91 @@ export function extractMCQOptions(messageText: string): MCQOption[] {
  */
 function extractExplicitChoices(text: string): string[] {
   const choices: string[] = [];
+  const lines = text.split('\n');
   
-  // Pattern 1: "A, B, C, or D" style
-  const orPattern = /(?:are you looking to|do you want to|choose from|options include|such as)\s+([^?]+?)(?:\?|$)/i;
-  const orMatch = text.match(orPattern);
-  
-  if (orMatch) {
-    const choicesText = orMatch[1];
-    // Split on commas and "or"
-    const parts = choicesText.split(/,\s*(?:or\s+)?|\s+or\s+/);
+  // Step 1: Extract from bullet points and numbered lists
+  for (const line of lines) {
+    // Match unordered bullet points (-, *, •)
+    let match = line.match(/^\s*[-*•]\s+(.*\S.*)$/);
+    if (match) {
+      let option = match[1].trim();
+      // Clean up question format "Are they general cat lovers?" -> "General cat lovers"
+      option = option.replace(/^(?:are they|do they have?|what)\s+/i, '').replace(/\?$/, '');
+      if (option.length > 0) {
+        choices.push(option);
+      }
+    }
     
-    for (const part of parts) {
-      const cleaned = part.trim().replace(/^(to\s+)?/, '').replace(/[,.]$/, '');
-      if (cleaned && cleaned.length > 0) {
-        choices.push(cleaned);
+    // Match numbered lists (1., 2., etc.)
+    if (!match) {
+      match = line.match(/^\s*\d+[\.\)]\s+(.*\S.*)$/);
+      if (match) {
+        let option = match[1].trim();
+        option = option.replace(/^(?:are they|do they have?|what)\s+/i, '').replace(/\?$/, '');
+        if (option.length > 0) {
+          choices.push(option);
+        }
+      }
+    }
+    
+    // Match alphabetic lists (a., A), etc.)
+    if (!match) {
+      match = line.match(/^\s*[a-zA-Z][\.\)]\s+(.*\S.*)$/);
+      if (match) {
+        let option = match[1].trim();
+        option = option.replace(/^(?:are they|do they have?|what)\s+/i, '').replace(/\?$/, '');
+        if (option.length > 0) {
+          choices.push(option);
+        }
       }
     }
   }
   
-  // Pattern 2: Simple enumeration "X, Y, Z, or something else"
+  // Step 2: Extract from inline choices with "or" and commas
   if (choices.length === 0) {
-    const enumPattern = /([^.]+?)(?:,\s*(?:or\s+)?([^,]+?))*,?\s*or\s+([^?]+?)(?:\?|$)/;
-    const enumMatch = text.match(enumPattern);
-    if (enumMatch) {
-      const allParts = text.match(/\b(?:entertain|educate|promote|raise awareness|something else|other)\b/gi);
-      if (allParts) {
-        choices.push(...allParts.map(p => p.toLowerCase()));
+    // Pattern: "like cute kittens, funny cat antics, or educational content"
+    const inlinePattern = /(?:like|such as|including)\s+([^?]+?)(?:\?|$)/i;
+    const inlineMatch = text.match(inlinePattern);
+    if (inlineMatch) {
+      const choicesText = inlineMatch[1];
+      const parts = choicesText.split(/,\s*(?:or\s+)?|\s+or\s+/);
+      for (const part of parts) {
+        const cleaned = part.trim().replace(/[,.]$/, '');
+        if (cleaned && cleaned.length > 2) {
+          choices.push(cleaned);
+        }
+      }
+    }
+  }
+  
+  // Step 3: Extract from parenthetical examples (e.g., children, teens, adults)
+  if (choices.length === 0) {
+    const parentheticalPattern = /\(\s*e\.g\.,\s*([^)]+?)\)/i;
+    const parentheticalMatch = text.match(parentheticalPattern);
+    if (parentheticalMatch) {
+      const exampleText = parentheticalMatch[1];
+      const parts = exampleText.split(/,\s*/);
+      for (const part of parts) {
+        const cleaned = part.trim();
+        if (cleaned && cleaned.length > 0) {
+          choices.push(cleaned);
+        }
+      }
+    }
+  }
+  
+  // Step 4: Final attempt at simple enumeration patterns
+  if (choices.length === 0) {
+    const simplePattern = /(?:are you looking to|do you want to|choose from|options include)\s+([^?]+?)(?:\?|$)/i;
+    const simpleMatch = text.match(simplePattern);
+    if (simpleMatch) {
+      const choicesText = simpleMatch[1];
+      const parts = choicesText.split(/,\s*(?:or\s+)?|\s+or\s+/);
+      for (const part of parts) {
+        const cleaned = part.trim().replace(/^(to\s+)?/, '').replace(/[,.]$/, '');
+        if (cleaned && cleaned.length > 0) {
+          choices.push(cleaned);
+        }
       }
     }
   }
