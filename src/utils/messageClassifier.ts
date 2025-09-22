@@ -197,47 +197,133 @@ export function extractMCQOptions(messageText: string): MCQOption[] {
  * Generate default MCQ options based on message content
  * This ensures ALL assistant messages have interactive options
  */
+/**
+ * Extract explicit options from agent questions
+ * Handles patterns like "A, B, C, or D" or "Are you looking to X, Y, Z?"
+ */
+function extractExplicitChoices(text: string): string[] {
+  const choices: string[] = [];
+  
+  // Pattern 1: "A, B, C, or D" style
+  const orPattern = /(?:are you looking to|do you want to|choose from|options include|such as)\s+([^?]+?)(?:\?|$)/i;
+  const orMatch = text.match(orPattern);
+  
+  if (orMatch) {
+    const choicesText = orMatch[1];
+    // Split on commas and "or"
+    const parts = choicesText.split(/,\s*(?:or\s+)?|\s+or\s+/);
+    
+    for (const part of parts) {
+      const cleaned = part.trim().replace(/^(to\s+)?/, '').replace(/[,.]$/, '');
+      if (cleaned && cleaned.length > 0) {
+        choices.push(cleaned);
+      }
+    }
+  }
+  
+  // Pattern 2: Simple enumeration "X, Y, Z, or something else"
+  if (choices.length === 0) {
+    const enumPattern = /([^.]+?)(?:,\s*(?:or\s+)?([^,]+?))*,?\s*or\s+([^?]+?)(?:\?|$)/;
+    const enumMatch = text.match(enumPattern);
+    if (enumMatch) {
+      const allParts = text.match(/\b(?:entertain|educate|promote|raise awareness|something else|other)\b/gi);
+      if (allParts) {
+        choices.push(...allParts.map(p => p.toLowerCase()));
+      }
+    }
+  }
+  
+  return choices.filter((c, i, arr) => arr.indexOf(c) === i); // dedupe
+}
+
+/**
+ * Detect question intent and generate appropriate options
+ */
+function getContextualOptions(text: string): MCQOption[] {
+  const lowerText = text.toLowerCase();
+  
+  // Video purpose questions
+  if (lowerText.includes('purpose') || lowerText.includes('achieve') || 
+      lowerText.includes('goal') || lowerText.includes('hope to')) {
+    return [
+      { label: 'A', text: 'Entertain', fullText: 'A. Entertain' },
+      { label: 'B', text: 'Educate', fullText: 'B. Educate' },
+      { label: 'C', text: 'Promote a product', fullText: 'C. Promote a product' },
+      { label: 'D', text: 'Raise awareness', fullText: 'D. Raise awareness' },
+      { label: 'E', text: 'Something else', fullText: 'E. Something else' }
+    ];
+  }
+  
+  // Yes/No questions
+  if (lowerText.includes('do you') && (lowerText.includes('want') || lowerText.includes('need') || lowerText.includes('have'))) {
+    return [
+      { label: 'A', text: 'Yes', fullText: 'A. Yes' },
+      { label: 'B', text: 'No', fullText: 'B. No' },
+      { label: 'C', text: 'I\'m not sure', fullText: 'C. I\'m not sure' }
+    ];
+  }
+  
+  // Preference questions
+  if (lowerText.includes('prefer') || lowerText.includes('like') || lowerText.includes('choose')) {
+    return [
+      { label: 'A', text: 'Option A', fullText: 'A. Option A' },
+      { label: 'B', text: 'Option B', fullText: 'B. Option B' },
+      { label: 'C', text: 'Neither', fullText: 'C. Neither' },
+      { label: 'D', text: 'I need more information', fullText: 'D. I need more information' }
+    ];
+  }
+  
+  // Style/approach questions
+  if (lowerText.includes('style') || lowerText.includes('approach') || lowerText.includes('tone')) {
+    return [
+      { label: 'A', text: 'Professional', fullText: 'A. Professional' },
+      { label: 'B', text: 'Casual', fullText: 'B. Casual' },
+      { label: 'C', text: 'Creative', fullText: 'C. Creative' },
+      { label: 'D', text: 'Let\'s discuss options', fullText: 'D. Let\'s discuss options' }
+    ];
+  }
+  
+  // Audience questions
+  if (lowerText.includes('audience') || lowerText.includes('target') || lowerText.includes('viewers')) {
+    return [
+      { label: 'A', text: 'General public', fullText: 'A. General public' },
+      { label: 'B', text: 'Specific demographic', fullText: 'B. Specific demographic' },
+      { label: 'C', text: 'Professionals', fullText: 'C. Professionals' },
+      { label: 'D', text: 'I\'m not sure yet', fullText: 'D. I\'m not sure yet' }
+    ];
+  }
+  
+  return [];
+}
+
 export function generateDefaultMCQOptions(messageText: string): MCQOption[] {
-  // First try to extract options from the message itself
+  // First try to extract explicit numbered options (1='text' format)
   const extractedOptions = extractMCQOptions(messageText);
   if (extractedOptions.length > 0) {
     return extractedOptions;
   }
   
-  // If no options found in message, generate contextual fallback options
-  const defaultOptions: MCQOption[] = [];
-  
-  // Check for clarification/follow-up patterns
-  if (messageText.toLowerCase().includes('would you like') || 
-      messageText.toLowerCase().includes('shall i') ||
-      messageText.toLowerCase().includes('should we') ||
-      messageText.toLowerCase().includes('do you want')) {
-    defaultOptions.push(
-      { label: 'A', text: 'Yes, let\'s do that', fullText: 'A. Yes, let\'s do that' },
-      { label: 'B', text: 'No, let\'s try something else', fullText: 'B. No, let\'s try something else' },
-      { label: 'C', text: 'I need more information first', fullText: 'C. I need more information first' }
-    );
-  }
-  // Check for next steps patterns  
-  else if (messageText.toLowerCase().includes('next') ||
-           messageText.toLowerCase().includes('now') ||
-           messageText.toLowerCase().includes('let\'s')) {
-    defaultOptions.push(
-      { label: 'A', text: 'Continue with this approach', fullText: 'A. Continue with this approach' },
-      { label: 'B', text: 'Explore alternatives', fullText: 'B. Explore alternatives' },
-      { label: 'C', text: 'Tell me more about this', fullText: 'C. Tell me more about this' },
-      { label: 'D', text: 'Go back to previous topic', fullText: 'D. Go back to previous topic' }
-    );
-  }
-  // Default options for any response
-  else {
-    defaultOptions.push(
-      { label: 'A', text: 'Tell me more', fullText: 'A. Tell me more' },
-      { label: 'B', text: 'Let\'s move on', fullText: 'B. Let\'s move on' },
-      { label: 'C', text: 'Can you clarify that?', fullText: 'C. Can you clarify that?' },
-      { label: 'D', text: 'I have a different question', fullText: 'D. I have a different question' }
-    );
+  // Try to extract explicit choices from the question text
+  const explicitChoices = extractExplicitChoices(messageText);
+  if (explicitChoices.length >= 2) {
+    return explicitChoices.map((choice, index) => ({
+      label: String.fromCharCode(65 + index), // A, B, C, D...
+      text: choice.charAt(0).toUpperCase() + choice.slice(1),
+      fullText: `${String.fromCharCode(65 + index)}. ${choice.charAt(0).toUpperCase() + choice.slice(1)}`
+    }));
   }
   
-  return defaultOptions;
+  // Generate contextual options based on question intent
+  const contextualOptions = getContextualOptions(messageText);
+  if (contextualOptions.length > 0) {
+    return contextualOptions;
+  }
+  
+  // Final fallback to generic options
+  return [
+    { label: 'A', text: 'Tell me more', fullText: 'A. Tell me more' },
+    { label: 'B', text: 'Let\'s move on', fullText: 'B. Let\'s move on' },
+    { label: 'C', text: 'Can you clarify that?', fullText: 'C. Can you clarify that?' },
+    { label: 'D', text: 'I have a different question', fullText: 'D. I have a different question' }
+  ];
 }
