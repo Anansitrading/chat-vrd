@@ -2,6 +2,15 @@ export interface MCQOption {
   label: string;
   text: string;
   fullText: string;
+  followupQuestionId?: string; // ID of next question if this option is selected
+}
+
+export interface QuestionStep {
+  id: string;
+  prompt: string;
+  options: MCQOption[];
+  isConditional?: boolean; // Whether this question depends on a previous answer
+  parentOptionId?: string; // Which option from parent question triggers this
 }
 
 export interface ClassifiedMessage {
@@ -355,11 +364,128 @@ function getContextualOptions(text: string): MCQOption[] {
   return [];
 }
 
+/**
+ * Decompose complex multi-part questions into sequential steps
+ */
+function decomposeMultiPartQuestion(text: string): QuestionStep[] {
+  const steps: QuestionStep[] = [];
+  const lowerText = text.toLowerCase();
+  
+  // Detect audience questions with multiple parts
+  if (lowerText.includes('audience') && lowerText.includes('ideal')) {
+    const lines = text.split('\n').filter(line => line.trim().startsWith('-'));
+    
+    if (lines.length >= 2) {
+      // Step 1: General vs Specific audience
+      const hasGeneralQuestion = lines.some(line => line.toLowerCase().includes('general'));
+      const hasSpecificQuestion = lines.some(line => line.toLowerCase().includes('specific'));
+      const hasAgeQuestion = lines.some(line => line.toLowerCase().includes('age') || line.toLowerCase().includes('children') || line.toLowerCase().includes('teen'));
+      
+      if (hasGeneralQuestion && hasSpecificQuestion) {
+        // Create first question: audience type
+        steps.push({
+          id: 'audience_type',
+          prompt: 'What type of audience are you targeting?',
+          options: [
+            { 
+              label: 'A', 
+              text: 'General cat lovers', 
+              fullText: 'A. General cat lovers' 
+            },
+            { 
+              label: 'B', 
+              text: 'People with specific interests', 
+              fullText: 'B. People with specific interests',
+              followupQuestionId: 'specific_interests'
+            }
+          ]
+        });
+        
+        // Create conditional follow-up for specific interests
+        const interestOptions: MCQOption[] = [];
+        const interestLine = lines.find(line => line.toLowerCase().includes('specific'));
+        if (interestLine) {
+          const interests = extractExplicitChoices(interestLine);
+          if (interests.length > 0) {
+            interests.forEach((interest, index) => {
+              interestOptions.push({
+                label: String.fromCharCode(65 + index),
+                text: interest.charAt(0).toUpperCase() + interest.slice(1),
+                fullText: `${String.fromCharCode(65 + index)}. ${interest.charAt(0).toUpperCase() + interest.slice(1)}`
+              });
+            });
+          }
+        }
+        
+        if (interestOptions.length > 0) {
+          steps.push({
+            id: 'specific_interests',
+            prompt: 'Which specific interests?',
+            options: interestOptions,
+            isConditional: true,
+            parentOptionId: 'B'
+          });
+        }
+      }
+      
+      // Step 2: Age demographics (always ask)
+      if (hasAgeQuestion) {
+        const ageOptions: MCQOption[] = [];
+        const ageLine = lines.find(line => line.toLowerCase().includes('age') || line.toLowerCase().includes('children'));
+        if (ageLine) {
+          const ageGroups = extractExplicitChoices(ageLine);
+          if (ageGroups.length > 0) {
+            ageGroups.forEach((group, index) => {
+              ageOptions.push({
+                label: String.fromCharCode(65 + index),
+                text: group.charAt(0).toUpperCase() + group.slice(1),
+                fullText: `${String.fromCharCode(65 + index)}. ${group.charAt(0).toUpperCase() + group.slice(1)}`
+              });
+            });
+          } else {
+            // Default age options
+            ['Children', 'Teens', 'Adults', 'Families', 'Mixed audience'].forEach((group, index) => {
+              ageOptions.push({
+                label: String.fromCharCode(65 + index),
+                text: group,
+                fullText: `${String.fromCharCode(65 + index)}. ${group}`
+              });
+            });
+          }
+        }
+        
+        if (ageOptions.length > 0) {
+          steps.push({
+            id: 'age_group',
+            prompt: 'What age group are you targeting?',
+            options: ageOptions
+          });
+        }
+      }
+    }
+  }
+  
+  return steps;
+}
+
 export function generateDefaultMCQOptions(messageText: string): MCQOption[] {
   // First try to extract explicit numbered options (1='text' format)
   const extractedOptions = extractMCQOptions(messageText);
   if (extractedOptions.length > 0) {
     return extractedOptions;
+  }
+  
+  // Check if this is a complex multi-part question that should be decomposed
+  const questionSteps = decomposeMultiPartQuestion(messageText);
+  if (questionSteps.length > 1) {
+    // Return options for the first step only
+    // The UI will need to handle the sequential flow
+    const firstStep = questionSteps[0];
+    return firstStep.options.map(option => ({
+      ...option,
+      // Add metadata to indicate this is part of a multi-step flow
+      fullText: `${option.fullText} ${questionSteps.length > 1 ? '(1 of ' + questionSteps.length + ')' : ''}`
+    }));
   }
   
   // Try to extract explicit choices from the question text
@@ -385,4 +511,11 @@ export function generateDefaultMCQOptions(messageText: string): MCQOption[] {
     { label: 'C', text: 'Can you clarify that?', fullText: 'C. Can you clarify that?' },
     { label: 'D', text: 'I have a different question', fullText: 'D. I have a different question' }
   ];
+}
+
+/**
+ * Export question decomposition for UI components that need to handle multi-step flows
+ */
+export function getQuestionSteps(messageText: string): QuestionStep[] {
+  return decomposeMultiPartQuestion(messageText);
 }
