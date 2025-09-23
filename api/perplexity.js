@@ -2,7 +2,7 @@
  * Vercel serverless function to proxy Perplexity API calls
  * This keeps the API key secure on the server-side and prevents exposure to the browser
  */
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -27,8 +27,8 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // Extract request body
-    const { model, messages, stream, max_tokens, temperature } = req.body;
+    // Extract request body with safety check
+    const { model, messages, stream, max_tokens, temperature } = req.body || {};
 
     // Validate required fields
     if (!messages || !Array.isArray(messages)) {
