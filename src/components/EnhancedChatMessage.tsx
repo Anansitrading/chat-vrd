@@ -37,7 +37,8 @@ const MessageActionButton: React.FC<MessageActionButtonProps> = ({
 }) => {
   return (
     <button
-      onClick={() => {
+      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation(); // Prevent event bubbling
         console.log('[DEBUG] MessageActionButton clicked, label:', label);
         onClick();
       }}

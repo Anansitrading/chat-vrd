@@ -30,13 +30,17 @@ interface FeedbackImprovementRequest {
 }
 
 export class PerplexityService {
+  private apiKey: string | undefined;
+  
   constructor() {
-    // API key is now handled server-side, not exposed to browser
+    // For local development, check if API key is available via Vite
+    // @ts-ignore
+    this.apiKey = typeof process !== 'undefined' && process.env?.PERPLEXITY_API_KEY;
   }
 
   /**
    * Gets an improved response from Perplexity API based on user feedback
-   * Now uses serverless API endpoint to keep API key secure
+   * Uses serverless API endpoint in production, direct API in development
    */
   async getImprovedResponse(request: FeedbackImprovementRequest): Promise<string> {
     const messages: PerplexityMessage[] = [
@@ -63,26 +67,48 @@ export class PerplexityService {
     }
 
     try {
-      // Call our serverless API endpoint instead of Perplexity directly
-      const response = await fetch('/api/perplexity', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'pplx-7b-online', // Use sonar-pro if available for higher quality
-          stream: false,
-          max_tokens: 1024,
-          temperature: 0.2, // Slightly higher than 0 for more natural responses
-          messages: messages
-        }),
-      });
+      let response: Response;
+      
+      // Check if we're in development with a local API key
+      if (this.apiKey && window.location.hostname === 'localhost') {
+        // Direct API call for local development
+        response = await fetch('https://api.perplexity.ai/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'pplx-7b-online', // Use sonar-pro if available for higher quality
+            stream: false,
+            max_tokens: 1024,
+            temperature: 0.2, // Slightly higher than 0 for more natural responses
+            messages: messages
+          }),
+        });
+      } else {
+        // Call our serverless API endpoint in production
+        response = await fetch('/api/perplexity', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'pplx-7b-online', 
+            stream: false,
+            max_tokens: 1024,
+            temperature: 0.2,
+            messages: messages
+          }),
+        });
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Serverless API error:', errorText);
-        throw new Error(`Serverless API request failed: ${response.status} ${response.statusText}`);
+        console.error('Perplexity API error:', errorText);
+        throw new Error(`Perplexity API request failed: ${response.status} ${response.statusText}`);
       }
 
       const data: PerplexityResponse = await response.json();
@@ -93,17 +119,17 @@ export class PerplexityService {
 
       return data.choices[0].message.content.trim();
     } catch (error) {
-      console.error('Error calling Perplexity API via serverless function:', error);
+      console.error('Error calling Perplexity API:', error);
       throw new Error('Failed to get improved response from Perplexity API');
     }
   }
 
   /**
    * Check if the Perplexity service is available
-   * Always true since API key is handled server-side
    */
   isAvailable(): boolean {
-    return true;
+    // Available if we have a local API key or in production (serverless)
+    return !!(this.apiKey || window.location.hostname !== 'localhost');
   }
 }
 
