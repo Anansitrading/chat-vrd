@@ -167,6 +167,54 @@ The system prompt in `constants.ts` implements:
 ### Environment Variables Required
 - `GEMINI_API_KEY`: Google Gemini API key (mark as sensitive in Vercel)
 
+## Chat History Status
+
+The chat history persistence exists at the service layer but is not accessible in the UI yet, and production writes are likely bypassed due to environment config.
+
+Current implementation status:
+- Database: `public.chat_sessions` and `public.messages` tables exist in Supabase with RLS enabled (policies allow users to manage their own sessions/messages).
+- Writes: App attempts to create a session and write messages when Supabase is available.
+- Reads: There is no UI to list previous chat sessions or load their messages.
+- Config: The app uses `process.env.SUPABASE_URL` and `process.env.SUPABASE_ANON_KEY`, which do not work in a Vite React browser build. Vite requires `import.meta.env.VITE_*` variables. This likely makes Supabase unavailable in production, so no data is saved.
+- Race condition: The initial welcome message is attempted to be saved using `currentChatId` immediately after setting state, so it never persists due to stale state in the `useEffect` closure.
+
+Verified via Supabase MCP:
+- Tables present with 0 rows (indicating no persisted history writes reached the DB in the targeted project).
+- RLS policies present allowing authenticated users to manage their own data.
+
+Action items to make Chat History accessible:
+1) Environment variables (required)
+   - Rename variables to Vite format and reference them via `import.meta.env` in code.
+     - .env / Vercel:
+       - VITE_SUPABASE_URL
+       - VITE_SUPABASE_ANON_KEY
+     - In `supabaseService.ts`:
+       - `const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;`
+       - `const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;`
+   - Update `.env.local.example` accordingly and add Vercel project envs.
+
+2) Fix initialization race (should persist welcome message)
+   - When creating a new chat session, use the returned `session.id` directly for the first writes instead of relying on `currentChatId` state inside the same effect.
+   - Example pattern:
+     - `const session = await supabaseService.createChatSession('Kijko Chat Session');`
+     - `if (session) { await supabaseService.addMessage(session.id, welcomeMessage.text, 'assistant'); setCurrentChatId(session.id); }`
+
+3) Add retrieval UI (make history accessible)
+   - Add a Sessions list panel (e.g., left sidebar) that calls `supabaseService.getChatSessions()` and lets the user pick a session.
+   - On session select, call `supabaseService.getMessages(sessionId)` and set `messages` in state to render past conversation.
+   - Provide a “New chat” action that creates a new session and focuses input.
+
+4) Optional quality-of-life improvements
+   - Persist the last opened session ID in localStorage so the user returns to their last chat.
+   - Add pagination or infinite scroll on messages if needed.
+   - Add a simple search that calls `supabaseService.searchMessages(query)`.
+
+Acceptance criteria:
+- On page load, if a previous session exists, it is visible and can be opened.
+- The user can explicitly switch between sessions via the UI.
+- New sessions and messages persist to Supabase and are visible across reloads.
+- No raw `process.env.*` usage in front-end code; only `import.meta.env.VITE_*`.
+
 ## Troubleshooting
 
 ### Common Issues
