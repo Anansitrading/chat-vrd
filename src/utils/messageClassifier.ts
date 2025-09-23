@@ -166,6 +166,10 @@ export function extractMCQOptions(messageText: string): MCQOption[] {
   const options: MCQOption[] = [];
   const lines = normalizedText.split('\n');
 
+  // CRITICAL: Find the main question line first (ends with ?)
+  const questionLineIndex = lines.findIndex(line => line.trim().endsWith('?'));
+  const startIndex = questionLineIndex >= 0 ? questionLineIndex + 1 : 0;
+
   // 1) Try explicit numbered options: 1 = 'text' | 1. text | 1: text
   const eqPattern = /^(\d+)\s*=\s*["']([^"']+)["']\s*$/;
   const dotPattern = /^(\d+)[\.:]\s+(.+)$/;
@@ -173,7 +177,9 @@ export function extractMCQOptions(messageText: string): MCQOption[] {
   // 2) Try bullet point options with text content (most common format)
   const bulletPattern = /^\s*[•\-*]\s+(.+)$/;
   
-  for (const raw of lines) {
+  // Only process lines AFTER the main question
+  for (let i = startIndex; i < lines.length; i++) {
+    const raw = lines[i];
     const line = sanitize(raw);
     let m = eqPattern.exec(line);
     if (m) {
@@ -188,7 +194,7 @@ export function extractMCQOptions(messageText: string): MCQOption[] {
     
     // Check for bullet point format without sanitize removing bullets
     m = bulletPattern.exec(raw);
-    if (m && m[1].trim().length > 3) { // Only meaningful options
+    if (m && m[1].trim().length > 3 && !m[1].trim().endsWith('?')) { // Only meaningful options, NOT questions
       options.push({ 
         label: String(options.length + 1), 
         text: m[1].trim(), 
@@ -228,8 +234,15 @@ function extractExplicitChoices(text: string): string[] {
   const choices: string[] = [];
   const lines = text.split('\n');
   
+  // CRITICAL: Find the main question first (line ending with ?)
+  // Everything before this is likely context/question, not an option
+  const questionLineIndex = lines.findIndex(line => line.trim().endsWith('?'));
+  const startIndex = questionLineIndex >= 0 ? questionLineIndex + 1 : 0;
+  
   // Step 1: Extract from bullet points and numbered lists
-  for (const line of lines) {
+  // Only process lines AFTER the main question
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i];
     // Match unordered bullet points (-, *, •)
     let match = line.match(/^\s*[-*•]\s+(.*\S.*)$/);
     if (match) {

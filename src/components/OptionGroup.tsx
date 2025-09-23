@@ -248,7 +248,7 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
   const isShortLayout = short ?? options.every(option => option.text.length <= 30);
 
   const handleToggle = useCallback((option: MCQOption) => {
-    if (disabled) return;
+    if (disabled || isProcessing) return; // Prevent clicks during processing
 
     if (shouldAllowMultiple) {
       setSelectedOptions(prev => 
@@ -266,18 +266,21 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
         } else {
           // Select this option
           if (isRatingScale) {
-            // For rating scales, auto-submit immediately
+            // For rating scales, auto-submit immediately with guard
             setIsProcessing(true);
+            // Format as "I choose: X" will happen in ChatWindow
+            onSelect(option);
+            // Keep processing state to prevent double-clicks
             setTimeout(() => {
-              onSelect(option);
               setIsProcessing(false);
-            }, 150);
+              setSelectedOptions([]);
+            }, 500);
           }
           return [option];
         }
       });
     }
-  }, [disabled, shouldAllowMultiple, isRatingScale, onSelect]);
+  }, [disabled, shouldAllowMultiple, isRatingScale, onSelect, isProcessing]);
 
   const handleSubmit = useCallback(() => {
     if (selectedOptions.length > 0) {

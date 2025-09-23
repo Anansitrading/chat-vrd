@@ -208,14 +208,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const handleOptionSelect = useCallback(async (option: MCQOption) => {
     if (!chat) return;
     
-    const userMessage: UIMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      text: `${option.label}. ${option.text}`,
-      attachments: [],
-    };
-    setMessages(prev => [...prev, userMessage]);
-    
+    // Only send the formatted "I choose: X" message, not both
+    // This prevents double submission
     await handleSendMessage(`I choose: ${option.text}`, []);
   }, [chat, handleSendMessage]);
 
