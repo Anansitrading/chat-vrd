@@ -169,7 +169,10 @@ export function extractMCQOptions(messageText: string): MCQOption[] {
   // 1) Try explicit numbered options: 1 = 'text' | 1. text | 1: text
   const eqPattern = /^(\d+)\s*=\s*["']([^"']+)["']\s*$/;
   const dotPattern = /^(\d+)[\.:]\s+(.+)$/;
-
+  
+  // 2) Try bullet point options with text content (most common format)
+  const bulletPattern = /^\s*[•\-*]\s+(.+)$/;
+  
   for (const raw of lines) {
     const line = sanitize(raw);
     let m = eqPattern.exec(line);
@@ -180,6 +183,17 @@ export function extractMCQOptions(messageText: string): MCQOption[] {
     m = dotPattern.exec(line);
     if (m) {
       options.push({ label: m[1], text: m[2].trim(), fullText: line });
+      continue;
+    }
+    
+    // Check for bullet point format without sanitize removing bullets
+    m = bulletPattern.exec(raw);
+    if (m && m[1].trim().length > 3) { // Only meaningful options
+      options.push({ 
+        label: String(options.length + 1), 
+        text: m[1].trim(), 
+        fullText: m[1].trim() 
+      });
     }
   }
 
@@ -471,12 +485,17 @@ function decomposeMultiPartQuestion(text: string): QuestionStep[] {
 export function generateDefaultMCQOptions(messageText: string): MCQOption[] {
   const lowerText = messageText.toLowerCase();
   
-  // NEVER show buttons for open-ended questions
+  // FIRST: Always try to extract explicit numbered options (1='text' format)
+  // If options are provided, they MUST be shown regardless of keywords
+  const extractedOptions = extractMCQOptions(messageText);
+  if (extractedOptions.length > 0) {
+    return extractedOptions; // Options provided - ALWAYS use them
+  }
+  
+  // ONLY check for open-ended keywords if NO options were provided
   const openEndedIndicators = [
     'what is the main reason',
     'what do you hope',
-    'why do you',
-    'why did you',
     'describe',
     'explain',
     'tell me about',
@@ -489,14 +508,9 @@ export function generateDefaultMCQOptions(messageText: string): MCQOption[] {
     'elaborate on'
   ];
   
+  // Only apply open-ended detection when no explicit options exist
   if (openEndedIndicators.some(indicator => lowerText.includes(indicator))) {
-    return []; // No buttons for open-ended questions
-  }
-  
-  // First try to extract explicit numbered options (1='text' format)
-  const extractedOptions = extractMCQOptions(messageText);
-  if (extractedOptions.length > 0) {
-    return extractedOptions;
+    return []; // No buttons for truly open-ended questions without options
   }
   
   // Check if this is a complex multi-part question that should be decomposed
