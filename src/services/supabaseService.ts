@@ -65,10 +65,6 @@ class SupabaseService {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
     const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     
-    // DEBUG: Log environment variables
-    console.log('[DEBUG] VITE_SUPABASE_URL:', supabaseUrl ? 'Set (length: ' + supabaseUrl.length + ')' : 'Missing');
-    console.log('[DEBUG] VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Set (length: ' + supabaseAnonKey.length + ')' : 'Missing');
-    
     if (!supabaseUrl || !supabaseAnonKey) {
       console.warn('Supabase configuration is missing. Chat history features will not be available.');
       this.client = null as any; // Will cause errors if used without proper config
@@ -79,15 +75,59 @@ class SupabaseService {
   }
 
   /**
+   * Initialize the service and ensure user authentication
+   */
+  async initialize() {
+    if (!this.client) {
+      console.warn('Supabase client not configured');
+      return null;
+    }
+
+    try {
+      // First check if we have an existing session
+      const { data: { session } } = await this.client.auth.getSession();
+      
+      if (session) {
+        console.log('Using existing session for user:', session.user.id);
+        return session.user;
+      }
+      
+      // If no session, sign in anonymously
+      const { data, error } = await this.client.auth.signInAnonymously();
+      if (error) {
+        console.error('Failed to sign in anonymously:', error);
+        return null;
+      }
+      
+      console.log('Signed in anonymously as:', data.user?.id);
+      return data.user;
+    } catch (error) {
+      console.error('Failed to initialize auth:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get the current user
    */
   async getCurrentUser() {
-    const { data: { user }, error } = await this.client.auth.getUser();
-    if (error) {
-      console.error('Error getting current user:', error);
+    if (!this.client) return null;
+    
+    try {
+      const { data: { user }, error } = await this.client.auth.getUser();
+      if (error) {
+        // Try to initialize if no user found
+        if (error.message === 'Auth session missing') {
+          return await this.initialize();
+        }
+        console.error('Error getting current user:', error);
+        return null;
+      }
+      return user;
+    } catch (error) {
+      console.error('Error in getCurrentUser:', error);
       return null;
     }
-    return user;
   }
 
   /**
@@ -361,9 +401,7 @@ class SupabaseService {
    * Check if service is properly configured
    */
   isAvailable(): boolean {
-    const available = !!this.client;
-    console.log('[DEBUG] supabaseService.isAvailable():', available);
-    return available;
+    return !!this.client;
   }
 
   /**
