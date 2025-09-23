@@ -106,13 +106,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       setLoadingMessages(true);
       try {
         const supabaseMessages = await supabaseService.getMessages(currentChatId);
-        const uiMessages: UIMessage[] = supabaseMessages.map(msg => ({
+        const uiMessages: UIMessage[] = supabaseMessages.map((msg, index) => ({
           id: msg.id,
           role: msg.role === 'user' ? 'user' : 'model',
           text: msg.content,
           attachments: [],
           isStreaming: false,
-          showOptions: msg.role === 'assistant' ? true : undefined, // Enable MCQ for assistant messages only
+          // First message should never have options, subsequent assistant messages should
+          showOptions: msg.role === 'assistant' && index > 0 ? true : false,
         }));
         
         setMessages(uiMessages);
