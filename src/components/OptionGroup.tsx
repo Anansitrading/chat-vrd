@@ -180,6 +180,53 @@ const OptionRow: React.FC<OptionRowProps> = ({ option, onToggle, disabled = fals
   );
 };
 
+// Intelligent MCQ type detection
+function detectShouldAllowMultiple(
+  questionText: string | undefined, 
+  options: MCQOption[], 
+  allowMultipleProp?: boolean
+): boolean {
+  // If explicitly set, use that
+  if (allowMultipleProp !== undefined) return allowMultipleProp;
+  
+  const optionTexts = options.map(opt => opt.text.toLowerCase());
+  
+  // Check if all options are numbers (ratings, scales, etc) - ALWAYS single select
+  const allNumbers = options.every(opt => /^\d+(\.\d+)?$/.test(opt.text.trim()));
+  if (allNumbers) return false; // Numbers like 1-10 ratings are NEVER multi-select
+  
+  // Strong single-select indicators in options
+  if (optionTexts.some(t => 
+    t.includes('none of the above') || 
+    t.includes('all of the above') ||
+    t.match(/^(yes|no|maybe|unsure|not sure)$/)
+  )) {
+    return false; // These are typically single-select
+  }
+  
+  // Multi-select indicators in option content
+  const hasMultiSelectContent = options.some(opt => {
+    const text = opt.text.toLowerCase();
+    return (
+      // Lists of non-exclusive items
+      text.includes('interests') ||
+      text.includes('hobbies') ||
+      text.includes('skills') ||
+      text.includes('genres') ||
+      text.includes('activities') ||
+      // Multiple style/tone options that can coexist
+      (options.length > 2 && (
+        text.includes('energetic') || 
+        text.includes('mysterious') ||
+        text.includes('professional') ||
+        text.includes('casual')
+      ))
+    );
+  });
+  
+  return hasMultiSelectContent;
+}
+
 export const OptionGroup: React.FC<OptionGroupProps> = ({ 
   options, 
   onSelect,
@@ -191,13 +238,8 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
   const [selectedOptions, setSelectedOptions] = useState<MCQOption[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Determine if this should be multi-select based on content
-  const shouldAllowMultiple = allowMultiple || options.some(opt => 
-    opt.text.toLowerCase().includes('energetic') || 
-    opt.text.toLowerCase().includes('mysterious') ||
-    opt.text.toLowerCase().includes('style') ||
-    opt.text.toLowerCase().includes('tone')
-  );
+  // Use intelligent detection
+  const shouldAllowMultiple = detectShouldAllowMultiple(undefined, options, allowMultiple);
 
   // Determine layout based on option length or explicit short prop
   const isShortLayout = short ?? options.every(option => option.text.length <= 30);
