@@ -179,26 +179,43 @@ export function extractMCQOptions(messageText: string): MCQOption[] {
   
   // Only process lines AFTER the main question
   for (let i = startIndex; i < lines.length; i++) {
-    const raw = lines[i];
+    const raw = lines[i].trim();
+    if (!raw) continue; // Skip empty lines
+    
     const line = sanitize(raw);
+    
+    // Try numbered format: 1 = 'text'
     let m = eqPattern.exec(line);
     if (m) {
       options.push({ label: m[1], text: m[2].trim(), fullText: line });
       continue;
     }
+    
+    // Try numbered format: 1. text or 1: text
     m = dotPattern.exec(line);
     if (m) {
       options.push({ label: m[1], text: m[2].trim(), fullText: line });
       continue;
     }
     
-    // Check for bullet point format without sanitize removing bullets
+    // Try bullet point format
     m = bulletPattern.exec(raw);
-    if (m && m[1].trim().length > 3 && !m[1].trim().endsWith('?')) { // Only meaningful options, NOT questions
+    if (m && m[1].trim().length > 3 && !m[1].trim().endsWith('?')) {
       options.push({ 
         label: String(options.length + 1), 
         text: m[1].trim(), 
         fullText: m[1].trim() 
+      });
+      continue;
+    }
+    
+    // FALLBACK: If it's a non-empty line after the question and not already processed,
+    // treat it as an option (handles mixed formats like "Entertain" without bullet)
+    if (raw.length > 2 && !raw.endsWith('?') && !raw.includes(':')) {
+      options.push({ 
+        label: String(options.length + 1), 
+        text: raw, 
+        fullText: raw 
       });
     }
   }
