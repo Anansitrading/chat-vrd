@@ -51,17 +51,30 @@ export const Header: React.FC<HeaderProps> = ({ isTtsEnabled, setIsTtsEnabled, i
 
   return (
     <header className="flex items-center justify-between px-6 py-4 glass border-b border-white/10 flex-shrink-0">
-      <div className="flex items-center space-x-3">
-        {/* Menu Button */}
-        <button 
-          onClick={() => {
+      <div className="flex items-center space-x-3" style={{ border: '2px solid yellow', pointerEvents: 'auto' }}>
+        {/* Menu Button - DEBUG: Added visible border and z-index */}
+        <button
+          onClick={(e) => {
             console.log('[DEBUG] Button element onClick fired');
+            console.log('[DEBUG] Event target:', e.target);
+            e.stopPropagation();
             handleMenuClick();
           }}
-          className="p-2 rounded-lg text-gray-400 hover:text-white transition-colors focus-ring"
+          onMouseDown={() => console.log('[DEBUG] Button mousedown')}
+          onMouseUp={() => console.log('[DEBUG] Button mouseup')}
+          className="p-2 rounded-lg text-gray-400 hover:text-white transition-colors focus-ring relative z-50"
+          style={{ pointerEvents: 'auto', border: '2px solid red' }}
           aria-label="Open chat history"
+          aria-haspopup="true"
+          tabIndex={0}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              console.log('[DEBUG] Button keyboard activated');
+              handleMenuClick();
+            }
+          }}
         >
-          <Bars3Icon className="w-6 h-6" />
+          <Bars3Icon className="w-6 h-6 pointer-events-none" />
         </button>
         
         {/* App Icon with Gradient */}
