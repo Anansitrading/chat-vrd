@@ -214,6 +214,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   // Handle thumbs down feedback with Perplexity improvement
   const handleThumbsDown = useCallback(async (messageId: string) => {
+    console.log('[DEBUG] handleThumbsDown called with messageId:', messageId);
+    console.log('[DEBUG] perplexityService.isAvailable():', perplexityService.isAvailable());
+    
     if (!perplexityService.isAvailable()) {
       console.warn('Perplexity service not available for feedback improvement');
       return;
@@ -311,18 +314,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Chat Messages */}
       <div className="flex-1 overflow-hidden">
         <div className="h-full overflow-y-auto p-4 space-y-4">
-          {messages.map((message) => (
-            <EnhancedChatMessage
-              key={message.id}
-              message={message}
-              onOptionSelect={handleOptionSelect}
-              onThumbsDown={handleThumbsDown}
-              onCopy={handleCopy}
-              onSpeak={handleSpeak}
-              onRetry={handleRetry}
-              showActions={!isLoading}
-            />
-          ))}
+          {messages.map((message) => {
+            console.log('[DEBUG] Rendering message with onThumbsDown:', handleThumbsDown);
+            return (
+              <EnhancedChatMessage
+                key={message.id}
+                message={message}
+                onOptionSelect={handleOptionSelect}
+                onThumbsDown={handleThumbsDown}
+                onCopy={handleCopy}
+                onSpeak={handleSpeak}
+                onRetry={handleRetry}
+                showActions={!isLoading}
+              />
+            );
+          })}
           
           {/* Loading indicator when processing */}
           {isLoading && (

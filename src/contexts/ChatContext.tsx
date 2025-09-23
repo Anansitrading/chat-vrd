@@ -31,8 +31,10 @@ const ChatContext = createContext<ChatContextType | null>(null);
 export const useChat = () => {
   const context = useContext(ChatContext);
   if (!context) {
+    console.error('[DEBUG] useChat: context is null - not wrapped with ChatProvider');
     throw new Error('useChat must be used within a ChatProvider');
   }
+  console.log('[DEBUG] useChat: context found, sidebarOpen:', context.sidebarOpen);
   return context;
 };
 
@@ -45,6 +47,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  
+  // DEBUG: Log sidebar state changes
+  useEffect(() => {
+    console.log('[DEBUG] ChatContext: sidebarOpen changed to:', sidebarOpen);
+  }, [sidebarOpen]);
 
   // Load chat sessions from Supabase
   const loadChatSessions = async () => {
@@ -113,6 +120,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     createNewChat,
     switchToSession,
   };
+  
+  // DEBUG: Log provider render with context value
+  console.log('[DEBUG] ChatProvider render - setSidebarOpen:', setSidebarOpen, 'sidebarOpen:', sidebarOpen);
 
   return (
     <ChatContext.Provider value={value}>

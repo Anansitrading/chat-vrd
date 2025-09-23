@@ -82,6 +82,9 @@ export const ChatSidebar: React.FC = () => {
     createNewChat,
     switchToSession,
   } = useChat();
+  
+  // DEBUG: Log sidebar render state
+  console.log('[DEBUG] ChatSidebar render - sidebarOpen:', sidebarOpen);
 
   const handleNewChat = async () => {
     const newChatId = await createNewChat();

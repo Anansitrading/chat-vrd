@@ -37,7 +37,10 @@ const MessageActionButton: React.FC<MessageActionButtonProps> = ({
 }) => {
   return (
     <button
-      onClick={onClick}
+      onClick={() => {
+        console.log('[DEBUG] MessageActionButton clicked, label:', label);
+        onClick();
+      }}
       className={`
         p-2 rounded-lg transition-all duration-150
         ${variant === 'danger' 
@@ -95,8 +98,13 @@ const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
   }, [onSpeak, ttsText]);
 
   const handleThumbsDown = useCallback(() => {
+    console.log('[DEBUG] EnhancedChatMessage handleThumbsDown called');
+    console.log('[DEBUG] onThumbsDown prop:', onThumbsDown);
+    console.log('[DEBUG] message.id:', message.id);
     if (onThumbsDown) {
       onThumbsDown(message.id);
+    } else {
+      console.warn('[DEBUG] onThumbsDown prop is undefined');
     }
   }, [onThumbsDown, message.id]);
 

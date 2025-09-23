@@ -65,6 +65,10 @@ class SupabaseService {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
     const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     
+    // DEBUG: Log environment variables
+    console.log('[DEBUG] VITE_SUPABASE_URL:', supabaseUrl ? 'Set (length: ' + supabaseUrl.length + ')' : 'Missing');
+    console.log('[DEBUG] VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Set (length: ' + supabaseAnonKey.length + ')' : 'Missing');
+    
     if (!supabaseUrl || !supabaseAnonKey) {
       console.warn('Supabase configuration is missing. Chat history features will not be available.');
       this.client = null as any; // Will cause errors if used without proper config
@@ -357,7 +361,9 @@ class SupabaseService {
    * Check if service is properly configured
    */
   isAvailable(): boolean {
-    return !!this.client;
+    const available = !!this.client;
+    console.log('[DEBUG] supabaseService.isAvailable():', available);
+    return available;
   }
 
   /**

@@ -14,6 +14,9 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ isTtsEnabled, setIsTtsEnabled, isSpeaking, stopSpeech }) => {
     const { setSidebarOpen } = useChat();
     
+    // DEBUG: Log context value on every render
+    console.log('[DEBUG] Header: setSidebarOpen:', setSidebarOpen);
+    
     const handleToggle = () => {
         if (isSpeaking) {
             stopSpeech();
@@ -22,7 +25,9 @@ export const Header: React.FC<HeaderProps> = ({ isTtsEnabled, setIsTtsEnabled, i
     };
     
     const handleMenuClick = () => {
+        console.log('[DEBUG] Menu button clicked');
         setSidebarOpen(true);
+        console.log('[DEBUG] setSidebarOpen(true) called');
     };
 
     const handleClose = () => {
@@ -49,7 +54,10 @@ export const Header: React.FC<HeaderProps> = ({ isTtsEnabled, setIsTtsEnabled, i
       <div className="flex items-center space-x-3">
         {/* Menu Button */}
         <button 
-          onClick={handleMenuClick}
+          onClick={() => {
+            console.log('[DEBUG] Button element onClick fired');
+            handleMenuClick();
+          }}
           className="p-2 rounded-lg text-gray-400 hover:text-white transition-colors focus-ring"
           aria-label="Open chat history"
         >
