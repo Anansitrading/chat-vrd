@@ -7,7 +7,6 @@ import { Header } from './components/Header';
 import EnhancedChatMessage from './components/EnhancedChatMessage';
 import { ChatSidebar } from './components/ChatSidebar';
 import { ChatWindow } from './components/ChatWindow';
-import { AuthGate } from './components/AuthGate';
 import { ChatProvider, useChat } from './contexts/ChatContext';
 import { UIMessage, Attachment } from './types';
 import { startKijkoChat, sendMessageToKijkoStream } from './services/geminiService';
@@ -25,17 +24,15 @@ const AppContent: React.FC = () => {
   return (
     <div className="flex flex-col h-screen" style={{ background: 'var(--bg-main)' }}>
       <Header isTtsEnabled={isTtsEnabled} setIsTtsEnabled={setIsTtsEnabled} isSpeaking={isSpeaking} stopSpeech={stopTts} />
-      <AuthGate>
-        {/* Chat Sidebar */}
-        <ChatSidebar />
-        {/* Chat Window */}
-        <ChatWindow 
-          isTtsEnabled={isTtsEnabled}
-          isSpeaking={isSpeaking}
-          speak={speak}
-          stopTts={stopTts}
-        />
-      </AuthGate>
+      {/* Chat Sidebar */}
+      <ChatSidebar />
+      {/* Chat Window */}
+      <ChatWindow 
+        isTtsEnabled={isTtsEnabled}
+        isSpeaking={isSpeaking}
+        speak={speak}
+        stopTts={stopTts}
+      />
     </div>
   );
 };

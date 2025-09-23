@@ -41,19 +41,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       // If no current chat ID, create a new session
       if (!currentChatId && supabaseService.isAvailable()) {
         try {
-          const user = await supabaseService.getCurrentUser();
+          let user = await supabaseService.getCurrentUser();
           if (!user) {
-            // No authenticated user; show welcome message locally without persisting
-            const welcomeMessage: UIMessage = {
-              id: Date.now().toString(),
-              role: 'model',
-              text: "Hello! I'm Kijko, your video brief assistant. I'll help you create a comprehensive production plan for your video project. To get started, could you tell me about your video idea? Feel free to share as much or as little as you have in mind, and we'll build from there.",
-              attachments: [],
-              isStreaming: false,
-              showOptions: false,
-            };
-            setMessages([welcomeMessage]);
-            return;
+            user = await supabaseService.signInAnonymously();
           }
 
           const newSessionId = await createNewChat();
