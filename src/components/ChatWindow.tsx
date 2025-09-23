@@ -242,9 +242,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         originalResponse: messageToImprove.text
       });
 
+      const improvedText = `${improvedResponse}\n\n*[This response was improved using Perplexity AI]*`;
+      console.log('[DEBUG] Setting improved text:', improvedText);
+      console.log('[DEBUG] Text includes asterisks:', improvedText.includes('*'));
       setMessages(prev => prev.map(msg => 
         msg.id === messageId 
-          ? { ...msg, text: `${improvedResponse}\n\n*[This response was improved using Perplexity AI]*` }
+          ? { ...msg, text: improvedText }
           : msg
       ));
 

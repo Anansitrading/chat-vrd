@@ -208,6 +208,8 @@ const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
                   className="prose prose-invert prose-sm max-w-none"
                   aria-live={isStreaming ? 'polite' : undefined}
                 >
+                  {console.log('[DEBUG] Rendering assistant message text:', message.text)}
+                  {console.log('[DEBUG] Text contains asterisks:', message.text.includes('*'))}
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={markdownComponents}
