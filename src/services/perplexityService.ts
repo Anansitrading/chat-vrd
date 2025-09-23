@@ -34,9 +34,9 @@ export class PerplexityService {
   private readonly baseUrl = 'https://api.perplexity.ai/chat/completions';
 
   constructor() {
-    this.apiKey = process.env.PERPLEXITY_API_KEY || '';
+    this.apiKey = import.meta.env.VITE_PERPLEXITY_API_KEY || '';
     if (!this.apiKey) {
-      console.warn('PERPLEXITY_API_KEY is not set. Feedback improvement will not be available.');
+      console.warn('VITE_PERPLEXITY_API_KEY is not set. Feedback improvement will not be available.');
     }
   }
 
