@@ -60,6 +60,7 @@ export interface Database {
 
 class SupabaseService {
   private client: any; // TODO: Fix Supabase types properly
+  private initializePromise: Promise<any> | null = null;
 
   constructor() {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -82,43 +83,45 @@ class SupabaseService {
   /**
    * Initialize the service and ensure user authentication
    */
-  async initialize() {
+  async initialize(): Promise<any> {
     if (!this.client) {
       console.warn('Supabase client not configured');
       return null;
     }
 
-    try {
-      // First check if we have an existing session
-      const { data: { session } } = await this.client.auth.getSession();
-      
-      if (session && session.user) {
-        console.log('Using existing session for user:', session.user.id);
-        return session.user;
-      }
-      
-      // If no session, sign in anonymously
-      console.log('No existing session, signing in anonymously...');
-      const { data, error } = await this.client.auth.signInAnonymously();
-      if (error) {
-        console.error('Failed to sign in anonymously:', error);
-        // Try one more time with a delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const retryResult = await this.client.auth.signInAnonymously();
-        if (retryResult.error) {
-          console.error('Retry failed:', retryResult.error);
+    // If initialization is already in progress, return the existing promise
+    if (this.initializePromise) {
+      return this.initializePromise;
+    }
+
+    // Start a new initialization process
+    this.initializePromise = (async () => {
+      try {
+        const { data: { session } } = await this.client.auth.getSession();
+        if (session && session.user) {
+          console.log('Using existing session for user:', session.user.id);
+          return session.user;
+        }
+
+        console.log('No existing session, signing in anonymously...');
+        const { data, error } = await this.client.auth.signInAnonymously();
+        if (error) {
+          console.error('Failed to sign in anonymously:', error);
           return null;
         }
-        console.log('Retry successful, signed in as:', retryResult.data.user?.id);
-        return retryResult.data.user;
+
+        console.log('Signed in anonymously as:', data.user?.id);
+        return data.user;
+      } catch (error) {
+        console.error('Failed to initialize auth:', error);
+        return null;
+      } finally {
+        // Reset the promise after completion
+        this.initializePromise = null;
       }
-      
-      console.log('Signed in anonymously as:', data.user?.id);
-      return data.user;
-    } catch (error) {
-      console.error('Failed to initialize auth:', error);
-      return null;
-    }
+    })();
+
+    return this.initializePromise;
   }
 
   /**
@@ -127,22 +130,13 @@ class SupabaseService {
   async getCurrentUser() {
     if (!this.client) return null;
     
-    try {
-      // First try to get the session (more reliable than getUser)
-      const { data: { session }, error: sessionError } = await this.client.auth.getSession();
-      
-      if (session?.user) {
-        return session.user;
-      }
-      
-      // No session exists, try to initialize
-      console.log('No session found, initializing auth...');
-      return await this.initialize();
-    } catch (error) {
-      console.error('Error in getCurrentUser:', error);
-      // As a fallback, try to initialize
-      return await this.initialize();
+    const { data: { session } } = await this.client.auth.getSession();
+    if (session?.user) {
+      return session.user;
     }
+    
+    // If no session, initialize to sign in anonymously
+    return this.initialize();
   }
 
   /**
