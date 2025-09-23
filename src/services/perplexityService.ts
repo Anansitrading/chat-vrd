@@ -30,24 +30,15 @@ interface FeedbackImprovementRequest {
 }
 
 export class PerplexityService {
-  private readonly apiKey: string;
-  private readonly baseUrl = 'https://api.perplexity.ai/chat/completions';
-
   constructor() {
-    this.apiKey = import.meta.env.VITE_PERPLEXITY_API_KEY || '';
-    if (!this.apiKey) {
-      console.warn('VITE_PERPLEXITY_API_KEY is not set. Feedback improvement will not be available.');
-    }
+    // API key is now handled server-side, not exposed to browser
   }
 
   /**
    * Gets an improved response from Perplexity API based on user feedback
+   * Now uses serverless API endpoint to keep API key secure
    */
   async getImprovedResponse(request: FeedbackImprovementRequest): Promise<string> {
-    if (!this.apiKey) {
-      throw new Error('Perplexity API key is not configured');
-    }
-
     const messages: PerplexityMessage[] = [
       {
         role: 'system',
@@ -72,12 +63,12 @@ export class PerplexityService {
     }
 
     try {
-      const response = await fetch(this.baseUrl, {
+      // Call our serverless API endpoint instead of Perplexity directly
+      const response = await fetch('/api/perplexity', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
           model: 'pplx-7b-online', // Use sonar-pro if available for higher quality
@@ -90,8 +81,8 @@ export class PerplexityService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Perplexity API error:', errorText);
-        throw new Error(`Perplexity API request failed: ${response.status} ${response.statusText}`);
+        console.error('Serverless API error:', errorText);
+        throw new Error(`Serverless API request failed: ${response.status} ${response.statusText}`);
       }
 
       const data: PerplexityResponse = await response.json();
@@ -102,16 +93,17 @@ export class PerplexityService {
 
       return data.choices[0].message.content.trim();
     } catch (error) {
-      console.error('Error calling Perplexity API:', error);
+      console.error('Error calling Perplexity API via serverless function:', error);
       throw new Error('Failed to get improved response from Perplexity API');
     }
   }
 
   /**
    * Check if the Perplexity service is available
+   * Always true since API key is handled server-side
    */
   isAvailable(): boolean {
-    return !!this.apiKey;
+    return true;
   }
 }
 
