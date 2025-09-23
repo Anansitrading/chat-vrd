@@ -219,7 +219,7 @@ const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
                 </div>
               </div>
               
-              {!isStreaming && (
+              {!isStreaming && message.showOptions === true && (
                 <OptionGroup
                   options={generateDefaultMCQOptions(message.text)}
                   onSelect={handleOptionSelect}

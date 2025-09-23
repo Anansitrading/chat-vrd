@@ -57,10 +57,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               text: "Hello! I'm Kijko, your video brief assistant. I'll help you create a comprehensive production plan for your video project. To get started, could you tell me about your video idea? Feel free to share as much or as little as you have in mind, and we'll build from there.",
               attachments: [],
               isStreaming: false,
+              showOptions: false, // Don't show MCQ buttons on welcome message
             };
             
             setMessages([welcomeMessage]);
-            // Save using the new session ID directly (no race condition)
+            // Save using the new session ID directly (fixes race condition)
             await supabaseService.addMessage(newSessionId, welcomeMessage.text, 'assistant');
             await loadChatSessions(); // Refresh the sidebar
           }
@@ -73,6 +74,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             text: "Hello! I'm Kijko, your video brief assistant. I'll help you create a comprehensive production plan for your video project. To get started, could you tell me about your video idea? Feel free to share as much or as little as you have in mind, and we'll build from there.",
             attachments: [],
             isStreaming: false,
+            showOptions: false, // Don't show MCQ buttons on welcome message
           };
           setMessages([welcomeMessage]);
         }
@@ -94,6 +96,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             text: "Hello! I'm Kijko, your video brief assistant. I'll help you create a comprehensive production plan for your video project. To get started, could you tell me about your video idea? Feel free to share as much or as little as you have in mind, and we'll build from there.",
             attachments: [],
             isStreaming: false,
+            showOptions: false, // Don't show MCQ buttons on welcome message
           };
           setMessages([welcomeMessage]);
         }
@@ -109,6 +112,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           text: msg.content,
           attachments: [],
           isStreaming: false,
+          showOptions: msg.role === 'assistant' ? true : undefined, // Enable MCQ for assistant messages only
         }));
         
         setMessages(uiMessages);
@@ -121,6 +125,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           text: "Hello! I'm Kijko, your video brief assistant.",
           attachments: [],
           isStreaming: false,
+          showOptions: false, // Don't show MCQ buttons on welcome message
         };
         setMessages([welcomeMessage]);
       } finally {
@@ -159,6 +164,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       text: '',
       attachments: [],
       isStreaming: true,
+      showOptions: true, // Enable MCQ options for regular assistant messages
     };
     setMessages(prev => [...prev, modelMessage]);
 

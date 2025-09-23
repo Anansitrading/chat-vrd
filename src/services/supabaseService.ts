@@ -65,6 +65,10 @@ class SupabaseService {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
     const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     
+    // Debug logging
+    console.log('[Supabase] Initializing with URL:', supabaseUrl ? 'Set' : 'Missing');
+    console.log('[Supabase] Anon key:', supabaseAnonKey ? 'Set' : 'Missing');
+    
     if (!supabaseUrl || !supabaseAnonKey) {
       console.warn('Supabase configuration is missing. Chat history features will not be available.');
       this.client = null as any; // Will cause errors if used without proper config
@@ -72,6 +76,7 @@ class SupabaseService {
     }
 
     this.client = createClient<Database>(supabaseUrl, supabaseAnonKey);
+    console.log('[Supabase] Client created successfully');
   }
 
   /**
@@ -87,16 +92,25 @@ class SupabaseService {
       // First check if we have an existing session
       const { data: { session } } = await this.client.auth.getSession();
       
-      if (session) {
+      if (session && session.user) {
         console.log('Using existing session for user:', session.user.id);
         return session.user;
       }
       
       // If no session, sign in anonymously
+      console.log('No existing session, signing in anonymously...');
       const { data, error } = await this.client.auth.signInAnonymously();
       if (error) {
         console.error('Failed to sign in anonymously:', error);
-        return null;
+        // Try one more time with a delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const retryResult = await this.client.auth.signInAnonymously();
+        if (retryResult.error) {
+          console.error('Retry failed:', retryResult.error);
+          return null;
+        }
+        console.log('Retry successful, signed in as:', retryResult.data.user?.id);
+        return retryResult.data.user;
       }
       
       console.log('Signed in anonymously as:', data.user?.id);
@@ -114,19 +128,20 @@ class SupabaseService {
     if (!this.client) return null;
     
     try {
-      const { data: { user }, error } = await this.client.auth.getUser();
-      if (error) {
-        // Try to initialize if no user found
-        if (error.message === 'Auth session missing') {
-          return await this.initialize();
-        }
-        console.error('Error getting current user:', error);
-        return null;
+      // First try to get the session (more reliable than getUser)
+      const { data: { session }, error: sessionError } = await this.client.auth.getSession();
+      
+      if (session?.user) {
+        return session.user;
       }
-      return user;
+      
+      // No session exists, try to initialize
+      console.log('No session found, initializing auth...');
+      return await this.initialize();
     } catch (error) {
       console.error('Error in getCurrentUser:', error);
-      return null;
+      // As a fallback, try to initialize
+      return await this.initialize();
     }
   }
 

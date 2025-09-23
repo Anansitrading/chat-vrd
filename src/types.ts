@@ -3,10 +3,11 @@ export interface UIMessage {
   id: string;
   role: 'user' | 'model';
   text: string;
-  attachments: UIAttachment[];
+  attachments?: Attachment[];
   isStreaming?: boolean;
+  options?: MCQOption[];
+  showOptions?: boolean; // Control whether to show MCQ options
 }
-
 export interface UIAttachment {
   name: string;
   type: string; 
