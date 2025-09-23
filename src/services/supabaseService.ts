@@ -62,8 +62,8 @@ class SupabaseService {
   private client: any; // TODO: Fix Supabase types properly
 
   constructor() {
-    const supabaseUrl = process.env.SUPABASE_URL || '';
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     
     if (!supabaseUrl || !supabaseAnonKey) {
       console.warn('Supabase configuration is missing. Chat history features will not be available.');

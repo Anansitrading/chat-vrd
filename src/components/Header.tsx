@@ -2,6 +2,7 @@
 import React from 'react';
 import { Bars3Icon, SpeakerWaveIcon, SpeakerXMarkIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { SpeakerOnIcon, SpeakerOffIcon } from './icons/SpeakerIcons';
+import { useChat } from '../contexts/ChatContext';
 
 interface HeaderProps {
     isTtsEnabled: boolean;
@@ -11,11 +12,17 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ isTtsEnabled, setIsTtsEnabled, isSpeaking, stopSpeech }) => {
+    const { setSidebarOpen } = useChat();
+    
     const handleToggle = () => {
         if (isSpeaking) {
             stopSpeech();
         }
         setIsTtsEnabled(!isTtsEnabled);
+    };
+    
+    const handleMenuClick = () => {
+        setSidebarOpen(true);
     };
 
     const handleClose = () => {
@@ -42,8 +49,9 @@ export const Header: React.FC<HeaderProps> = ({ isTtsEnabled, setIsTtsEnabled, i
       <div className="flex items-center space-x-3">
         {/* Menu Button */}
         <button 
+          onClick={handleMenuClick}
           className="p-2 rounded-lg text-gray-400 hover:text-white transition-colors focus-ring"
-          aria-label="Menu"
+          aria-label="Open chat history"
         >
           <Bars3Icon className="w-6 h-6" />
         </button>
