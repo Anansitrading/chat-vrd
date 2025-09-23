@@ -240,6 +240,9 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
 
   // Use intelligent detection
   const shouldAllowMultiple = detectShouldAllowMultiple(undefined, options, allowMultiple);
+  
+  // Check if this is a rating scale (all numbers)
+  const isRatingScale = options.every(opt => /^\d+(\.\d+)?$/.test(opt.text.trim()));
 
   // Determine layout based on option length or explicit short prop
   const isShortLayout = short ?? options.every(option => option.text.length <= 30);
@@ -254,19 +257,27 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
           : [...prev, option]
       );
     } else {
-      // Single select - allow deselect on second click, no auto-submit
+      // Single select behavior
       setSelectedOptions(prev => {
         const isAlreadySelected = prev.find(opt => opt.label === option.label);
         if (isAlreadySelected) {
           // Deselect if clicking the same option
           return [];
         } else {
-          // Select this option only
+          // Select this option
+          if (isRatingScale) {
+            // For rating scales, auto-submit immediately
+            setIsProcessing(true);
+            setTimeout(() => {
+              onSelect(option);
+              setIsProcessing(false);
+            }, 150);
+          }
           return [option];
         }
       });
     }
-  }, [disabled, shouldAllowMultiple]);
+  }, [disabled, shouldAllowMultiple, isRatingScale, onSelect]);
 
   const handleSubmit = useCallback(() => {
     if (selectedOptions.length > 0) {
@@ -327,8 +338,8 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
         </div>
       )}
       
-      {/* Submit button for both multi-select and single-select */}
-      {selectedOptions.length > 0 && (
+      {/* Submit button only for multi-select and non-rating single-select */}
+      {selectedOptions.length > 0 && (shouldAllowMultiple || !isRatingScale) && (
         <div className="pt-3">
           <button
             onClick={handleSubmit}

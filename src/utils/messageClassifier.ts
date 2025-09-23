@@ -469,6 +469,30 @@ function decomposeMultiPartQuestion(text: string): QuestionStep[] {
 }
 
 export function generateDefaultMCQOptions(messageText: string): MCQOption[] {
+  const lowerText = messageText.toLowerCase();
+  
+  // NEVER show buttons for open-ended questions
+  const openEndedIndicators = [
+    'what is the main reason',
+    'what do you hope',
+    'why do you',
+    'why did you',
+    'describe',
+    'explain',
+    'tell me about',
+    'tell me more',
+    'what are your thoughts',
+    'how would you describe',
+    'what made you',
+    'what brings you',
+    'share your',
+    'elaborate on'
+  ];
+  
+  if (openEndedIndicators.some(indicator => lowerText.includes(indicator))) {
+    return []; // No buttons for open-ended questions
+  }
+  
   // First try to extract explicit numbered options (1='text' format)
   const extractedOptions = extractMCQOptions(messageText);
   if (extractedOptions.length > 0) {
@@ -504,13 +528,8 @@ export function generateDefaultMCQOptions(messageText: string): MCQOption[] {
     return contextualOptions;
   }
   
-  // Final fallback to generic options
-  return [
-    { label: 'A', text: 'Tell me more', fullText: 'A. Tell me more' },
-    { label: 'B', text: 'Let\'s move on', fullText: 'B. Let\'s move on' },
-    { label: 'C', text: 'Can you clarify that?', fullText: 'C. Can you clarify that?' },
-    { label: 'D', text: 'I have a different question', fullText: 'D. I have a different question' }
-  ];
+  // No fallback options - if we can't determine appropriate options, show none
+  return [];
 }
 
 /**
