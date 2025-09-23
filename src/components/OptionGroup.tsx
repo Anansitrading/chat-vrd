@@ -212,15 +212,19 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
           : [...prev, option]
       );
     } else {
-      // Single select - immediate submission
-      setSelectedOptions([option]);
-      setIsProcessing(true);
-      setTimeout(() => {
-        onSelect(option);
-        setIsProcessing(false);
-      }, 150);
+      // Single select - allow deselect on second click, no auto-submit
+      setSelectedOptions(prev => {
+        const isAlreadySelected = prev.find(opt => opt.label === option.label);
+        if (isAlreadySelected) {
+          // Deselect if clicking the same option
+          return [];
+        } else {
+          // Select this option only
+          return [option];
+        }
+      });
     }
-  }, [onSelect, disabled, shouldAllowMultiple]);
+  }, [disabled, shouldAllowMultiple]);
 
   const handleSubmit = useCallback(() => {
     if (selectedOptions.length > 0) {
@@ -281,8 +285,8 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
         </div>
       )}
       
-      {/* Submit button for multi-select */}
-      {shouldAllowMultiple && selectedOptions.length > 0 && (
+      {/* Submit button for both multi-select and single-select */}
+      {selectedOptions.length > 0 && (
         <div className="pt-3">
           <button
             onClick={handleSubmit}
@@ -295,7 +299,11 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
               disabled:opacity-50 disabled:cursor-not-allowed
             "
           >
-            {isProcessing ? 'Processing...' : `Continue with ${selectedOptions.length} selection${selectedOptions.length !== 1 ? 's' : ''}`}
+            {isProcessing ? 'Processing...' : 
+             shouldAllowMultiple ? 
+               `Continue with ${selectedOptions.length} selection${selectedOptions.length !== 1 ? 's' : ''}` :
+               'Continue'
+            }
           </button>
         </div>
       )}
