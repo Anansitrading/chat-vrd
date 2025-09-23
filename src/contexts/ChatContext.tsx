@@ -98,10 +98,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   // Initialize Supabase and load sessions on mount
   useEffect(() => {
     const initializeAndLoad = async () => {
-      // Initialize Supabase auth first
-      await supabaseService.initialize();
-      // Then load conversations
-      await loadChatSessions();
+      // Only load conversations if a user session already exists
+      if (!supabaseService.isAvailable()) return;
+      const client = supabaseService.getClient();
+      const { data: { session } } = await client.auth.getSession();
+      if (session?.user) {
+        await loadChatSessions();
+      }
     };
     initializeAndLoad();
   }, []);
