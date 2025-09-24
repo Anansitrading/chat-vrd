@@ -5,10 +5,11 @@ import { MCQOption } from '../utils/messageClassifier';
 interface OptionGroupProps {
   options: MCQOption[];
   onSelect: (option: MCQOption) => void;
-  onSubmit?: (selectedOptions: MCQOption[]) => void;
+  onSubmit?: (selectedOptions: MCQOption[], openText?: string) => void;
   disabled?: boolean;
   short?: boolean;
   allowMultiple?: boolean;
+  showOpenText?: boolean; // Add option to show/hide open text field
 }
 
 interface OptionButtonProps {
@@ -195,36 +196,9 @@ function detectShouldAllowMultiple(
   const allNumbers = options.every(opt => /^\d+(\.\d+)?$/.test(opt.text.trim()));
   if (allNumbers) return false; // Numbers like 1-10 ratings are NEVER multi-select
   
-  // Strong single-select indicators in options
-  if (optionTexts.some(t => 
-    t.includes('none of the above') || 
-    t.includes('all of the above') ||
-    t.match(/^(yes|no|maybe|unsure|not sure)$/)
-  )) {
-    return false; // These are typically single-select
-  }
-  
-  // Multi-select indicators in option content
-  const hasMultiSelectContent = options.some(opt => {
-    const text = opt.text.toLowerCase();
-    return (
-      // Lists of non-exclusive items
-      text.includes('interests') ||
-      text.includes('hobbies') ||
-      text.includes('skills') ||
-      text.includes('genres') ||
-      text.includes('activities') ||
-      // Multiple style/tone options that can coexist
-      (options.length > 2 && (
-        text.includes('energetic') || 
-        text.includes('mysterious') ||
-        text.includes('professional') ||
-        text.includes('casual')
-      ))
-    );
-  });
-  
-  return hasMultiSelectContent;
+  // For all non-scale questions, default to multi-select
+  // This ensures users can select multiple options as per requirements
+  return true; // Changed to always return true for non-scale questions
 }
 
 export const OptionGroup: React.FC<OptionGroupProps> = ({ 
@@ -233,10 +207,12 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
   onSubmit,
   disabled = false, 
   short,
-  allowMultiple = false
+  allowMultiple = false,
+  showOpenText = true // Default to showing open text for all questions
 }) => {
   const [selectedOptions, setSelectedOptions] = useState<MCQOption[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [openTextValue, setOpenTextValue] = useState<string>('');
 
   // Use intelligent detection
   const shouldAllowMultiple = detectShouldAllowMultiple(undefined, options, allowMultiple);
@@ -283,31 +259,49 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
   }, [disabled, shouldAllowMultiple, isRatingScale, onSelect, isProcessing]);
 
   const handleSubmit = useCallback(() => {
-    if (selectedOptions.length > 0) {
+    // Allow submit if options selected OR open text provided
+    if (selectedOptions.length > 0 || openTextValue.trim()) {
       setIsProcessing(true);
+      
+      // Combine selected options with open text
+      const combinedText = [
+        ...selectedOptions.map(opt => opt.text),
+        ...(openTextValue.trim() ? [`Other: ${openTextValue.trim()}`] : [])
+      ].join('; ');
+      
       if (onSubmit) {
-        onSubmit(selectedOptions);
+        onSubmit(selectedOptions, openTextValue.trim());
       } else {
-        // For single callback, submit first option or combined text
+        // For single callback, submit combined option with text
         const combinedOption: MCQOption = {
-          label: selectedOptions.map(opt => opt.label).join(','),
-          text: selectedOptions.map(opt => opt.text).join('; '),
-          fullText: selectedOptions.map(opt => opt.fullText).join('; ')
+          label: selectedOptions.length > 0 ? selectedOptions.map(opt => opt.label).join(',') : 'custom',
+          text: combinedText,
+          fullText: combinedText
         };
         onSelect(combinedOption);
       }
-      setTimeout(() => setIsProcessing(false), 150);
+      
+      // Reset after submission
+      setTimeout(() => {
+        setIsProcessing(false);
+        setSelectedOptions([]);
+        setOpenTextValue('');
+      }, 150);
     }
-  }, [selectedOptions, onSelect, onSubmit]);
+  }, [selectedOptions, openTextValue, onSelect, onSubmit]);
+
+  // Check if we should show the submit button
+  const canSubmit = selectedOptions.length > 0 || openTextValue.trim().length > 0;
+  const showSubmitButton = shouldAllowMultiple || (!isRatingScale && canSubmit);
 
   return (
     <div className="mt-4 space-y-3 animate-slide-up">
-      {shouldAllowMultiple && (
+      {shouldAllowMultiple && !isRatingScale && (
         <div className="text-sm text-gray-400 mb-3 flex items-center">
           <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
           </svg>
-          Select all that apply, or enter your custom answer below
+          Select all that apply, or enter your own answer below
         </div>
       )}
       
@@ -341,8 +335,39 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
         </div>
       )}
       
-      {/* Submit button only for multi-select and non-rating single-select */}
-      {selectedOptions.length > 0 && (shouldAllowMultiple || !isRatingScale) && (
+      {/* Open-ended text input for all non-scale questions */}
+      {showOpenText && !isRatingScale && (
+        <div className="pt-2">
+          <label className="block text-sm text-gray-400 mb-2">
+            <span className="flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6z" clipRule="evenodd" />
+              </svg>
+              Or provide your own answer (optional):
+            </span>
+          </label>
+          <textarea
+            value={openTextValue}
+            onChange={(e) => setOpenTextValue(e.target.value)}
+            placeholder="Type your answer here..."
+            disabled={disabled || isProcessing}
+            className="
+              w-full px-4 py-3 rounded-xl
+              bg-gray-700 text-white placeholder-gray-400
+              border border-gray-600 focus:border-blue-500
+              focus:outline-none focus:ring-2 focus:ring-blue-500/20
+              transition-all duration-150
+              disabled:opacity-50 disabled:cursor-not-allowed
+              resize-none
+            "
+            rows={3}
+            aria-label="Open-ended response"
+          />
+        </div>
+      )}
+      
+      {/* Submit button for multi-select and when there's input */}
+      {showSubmitButton && canSubmit && (
         <div className="pt-3">
           <button
             onClick={handleSubmit}
@@ -353,12 +378,15 @@ export const OptionGroup: React.FC<OptionGroupProps> = ({
               transition-all duration-150 ease-out
               btn-interactive focus-ring
               disabled:opacity-50 disabled:cursor-not-allowed
+              shadow-lg
             "
           >
             {isProcessing ? 'Processing...' : 
-             shouldAllowMultiple ? 
-               `Continue with ${selectedOptions.length} selection${selectedOptions.length !== 1 ? 's' : ''}` :
-               'Continue'
+             shouldAllowMultiple && selectedOptions.length > 0 ? 
+               `Submit ${selectedOptions.length} selection${selectedOptions.length !== 1 ? 's' : ''}${openTextValue.trim() ? ' + comment' : ''}` :
+               openTextValue.trim() && selectedOptions.length === 0 ?
+                 'Submit your answer' :
+                 'Continue'
             }
           </button>
         </div>
