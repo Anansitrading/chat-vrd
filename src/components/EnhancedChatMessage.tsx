@@ -174,7 +174,7 @@ const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
     
     // Style paragraphs
     p: ({ children }: { children: React.ReactNode }) => (
-      <p className="mb-2 last:mb-0">{children}</p>
+      <p className="mb-2 last:mb-0 text-white">{children}</p>
     )
   };
 
@@ -188,7 +188,7 @@ const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
         max-w-[85%] sm:max-w-[75%] 
         ${isUser 
           ? 'gradient-user rounded-tl-xl rounded-tr-xl rounded-bl-xl text-white' 
-          : 'bg-gray-800 rounded-tr-xl rounded-tl-xl rounded-br-xl text-white/90'
+          : 'bg-gray-800 rounded-tr-xl rounded-tl-xl rounded-br-xl text-white'
         }
         px-4 py-3 shadow-lg
         ${isStreaming ? 'animate-glow-pulse' : ''}
@@ -205,7 +205,7 @@ const EnhancedChatMessage: React.FC<EnhancedChatMessageProps> = ({
             <div>
               <div className="mb-2">
                 <div 
-                  className="prose prose-invert prose-sm max-w-none"
+                  className="prose prose-invert prose-sm max-w-none text-white"
                   aria-live={isStreaming ? 'polite' : undefined}
                 >
                   {console.log('[DEBUG] Rendering assistant message text:', message.text)}

@@ -40,19 +40,16 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
 
   if (!isVisible) return null;
 
-  const progressSize = isMobile ? 80 : 120;
+  const progressSize = isMobile ? 60 : 80;
   const containerClasses = `
     fixed z-50 
     ${isMobile 
       ? 'bottom-4 right-4' 
-      : 'right-6 top-1/2 -translate-y-1/2 lg:right-12'
+      : 'top-20 right-6 lg:right-8'
     }
-    flex flex-col items-center gap-3
-    p-4 bg-gray-800/80 backdrop-blur-sm rounded-2xl
-    shadow-xl border border-gray-700/50
+    flex flex-col items-center gap-2
     transition-all duration-300 ease-out
     ${isAnimating ? 'scale-105' : 'scale-100'}
-    hover:shadow-2xl hover:border-gray-600/50
   `;
 
   return (
@@ -67,35 +64,35 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
         
         {/* Center Content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-white`}>
+          <span className={`${isMobile ? 'text-sm' : 'text-lg'} font-bold text-white drop-shadow-lg`}>
             {Math.round(percentage)}%
           </span>
-          <span className="text-xs text-gray-400">
-            Step {currentStep} of {totalSteps}
+          <span className="text-[10px] text-gray-300 font-medium drop-shadow">
+            {currentStep}/{totalSteps}
           </span>
         </div>
       </div>
       
-      {/* Step Labels - Hide on very small screens */}
-      {(!isMobile || window.innerWidth > 400) && (
-        <div className="text-center space-y-2 max-w-[150px]">
+      {/* Step Labels - Show only on desktop, below the ring */}
+      {!isMobile && (
+        <div className="text-center space-y-1 max-w-[120px] mt-2">
           {/* Current Step */}
           <div className="animate-slide-up">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">
               Current
             </p>
-            <p className="text-sm font-semibold text-white truncate">
+            <p className="text-xs font-semibold text-gray-200 truncate drop-shadow">
               {currentStepLabel}
             </p>
           </div>
           
-          {/* Next Step */}
-          {nextStepLabel && (
+          {/* Next Step - Only show if not on last step */}
+          {nextStepLabel && percentage < 90 && (
             <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
-              <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">
                 Next
               </p>
-              <p className="text-sm text-gray-300 truncate">
+              <p className="text-xs text-gray-400 truncate">
                 {nextStepLabel}
               </p>
             </div>
@@ -103,24 +100,26 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
         </div>
       )}
       
-      {/* Visual indicator dots for steps */}
-      <div className="flex gap-1 mt-2">
-        {Array.from({ length: totalSteps }, (_, i) => (
-          <div
-            key={i}
-            className={`
-              h-1.5 transition-all duration-300
-              ${i < currentStep 
-                ? 'w-3 bg-gradient-to-r from-purple-500 to-pink-500' 
-                : i === currentStep
-                  ? 'w-6 bg-gradient-to-r from-purple-400 to-pink-400 animate-pulse'
-                  : 'w-1.5 bg-gray-600'
-              }
-              rounded-full
-            `}
-          />
-        ))}
-      </div>
+      {/* Visual indicator dots for steps - Only on desktop */}
+      {!isMobile && (
+        <div className="flex gap-1 mt-1">
+          {Array.from({ length: totalSteps }, (_, i) => (
+            <div
+              key={i}
+              className={`
+                h-1 transition-all duration-300
+                ${i < currentStep 
+                  ? 'w-2 bg-gradient-to-r from-purple-500 to-pink-500 opacity-80' 
+                  : i === currentStep
+                    ? 'w-4 bg-gradient-to-r from-purple-400 to-pink-400 animate-pulse'
+                    : 'w-1 bg-gray-600 opacity-50'
+                }
+                rounded-full
+              `}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

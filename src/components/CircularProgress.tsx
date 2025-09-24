@@ -36,7 +36,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
         fill="none"
         stroke="#374151"
         strokeWidth={strokeWidth}
-        opacity={0.3}
+        opacity={0.2}
       />
       
       {/* Progress circle */}
@@ -57,22 +57,22 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
         }}
       />
       
-      {/* Animated pulse effect on progress arc */}
+      {/* Subtle glow effect on progress arc */}
       <circle
         cx={size / 2}
         cy={size / 2}
         r={radius}
         fill="none"
         stroke="url(#progressGradient)"
-        strokeWidth={strokeWidth}
+        strokeWidth={strokeWidth + 2}
         strokeDasharray={circumference}
         strokeDashoffset={strokeDashoffset}
         strokeLinecap="round"
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        opacity={0.3}
+        opacity={0.2}
         style={{
           transition: 'stroke-dashoffset 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-          animation: 'pulse 2s ease-in-out infinite'
+          filter: 'blur(4px)'
         }}
       />
       
