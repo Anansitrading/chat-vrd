@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Chat } from '@google/genai';
 import { ChatInput } from './ChatInput';
 import EnhancedChatMessage from './EnhancedChatMessage';
@@ -31,7 +31,37 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const { isListening, transcript, startListening, stopListening, setTranscript, isSttSupported } = useSpeechToText();
+  
+  // Auto-scroll refs and constants
+  const SCROLL_THRESHOLD = 100;
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+  const userWasNearBottomRef = useRef(true);
+  
+  // Check if user is near bottom (within threshold)
+  const isUserNearBottom = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return true; // Default to true for initial load
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return distanceFromBottom < SCROLL_THRESHOLD;
+  }, []);
 
+  // Track scroll position before messages change
+  useEffect(() => {
+    userWasNearBottomRef.current = isUserNearBottom();
+  }, [messages.length, isUserNearBottom]);
+  
+  // Auto-scroll after new messages or content updates
+  useEffect(() => {
+    // Only scroll if user was previously near bottom
+    if (userWasNearBottomRef.current && bottomAnchorRef.current) {
+      // Small delay to ensure DOM updates are complete
+      requestAnimationFrame(() => {
+        bottomAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      });
+    }
+  }, [messages, isLoading]); // Trigger on messages change and loading state
+  
   // Initialize chat and session
   useEffect(() => {
     const initializeChat = async () => {
@@ -317,7 +347,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     <>
       {/* Chat Messages */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto p-4 space-y-4">
+        <div 
+          ref={scrollContainerRef}
+          className="h-full overflow-y-auto p-4 space-y-4"
+          onScroll={() => {
+            // Update the scroll position tracking when user manually scrolls
+            userWasNearBottomRef.current = isUserNearBottom();
+          }}
+        >
           {messages.map((message) => {
             console.log('[DEBUG] Rendering message with onThumbsDown:', handleThumbsDown);
             return (
@@ -346,6 +383,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               </div>
             </div>
           )}
+          
+          {/* Bottom anchor for auto-scroll */}
+          <div ref={bottomAnchorRef} aria-hidden="true" />
         </div>
       </div>
       
