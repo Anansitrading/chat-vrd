@@ -211,7 +211,17 @@ export function extractMCQOptions(messageText: string): MCQOption[] {
     
     // FALLBACK: If it's a non-empty line after the question and not already processed,
     // treat it as an option (handles mixed formats like "Entertain" without bullet)
-    if (raw.length > 2 && !raw.endsWith('?') && !raw.includes(':')) {
+    // BUT exclude lines that are clearly explanatory text
+    const isLikelyExplanation = 
+      raw.toLowerCase().includes('your answer') ||
+      raw.toLowerCase().includes('this helps') ||
+      raw.toLowerCase().includes('please') ||
+      raw.toLowerCase().includes('feel free') ||
+      raw.toLowerCase().includes('let me know') ||
+      raw.toLowerCase().includes('helps me') ||
+      raw.length > 100; // Long lines are probably explanations, not options
+    
+    if (raw.length > 2 && !raw.endsWith('?') && !raw.includes(':') && !isLikelyExplanation) {
       options.push({ 
         label: String(options.length + 1), 
         text: raw, 
@@ -512,11 +522,63 @@ function decomposeMultiPartQuestion(text: string): QuestionStep[] {
   return steps;
 }
 
+/**
+ * Parse structured MCQ formats (JSON or plain-text block)
+ */
+function parseStructuredMCQ(messageText: string): MCQOption[] {
+  // Check for JSON format: <begin>{...}<end>
+  const jsonMatch = messageText.match(/<begin>\s*({[\s\S]*?})\s*<end>/i);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[1]);
+      if (parsed.options && Array.isArray(parsed.options)) {
+        return parsed.options.map((opt: string, index: number) => ({
+          label: String(index + 1),
+          text: opt,
+          fullText: `${index + 1}. ${opt}`
+        }));
+      }
+    } catch (e) {
+      console.error('Failed to parse JSON MCQ:', e);
+    }
+  }
+  
+  // Check for plain-text block format: QUESTION:...OPTIONS:...END_OPTIONS
+  const blockMatch = messageText.match(/OPTIONS:\s*\n([\s\S]*?)END_OPTIONS/i);
+  if (blockMatch) {
+    const optionsText = blockMatch[1];
+    const options: MCQOption[] = [];
+    const lines = optionsText.split('\n').filter(line => line.trim());
+    
+    for (const line of lines) {
+      const match = line.match(/^\s*(\d+)\s*=\s*['"]?(.+?)['"]?\s*$/);
+      if (match) {
+        options.push({
+          label: match[1],
+          text: match[2].trim(),
+          fullText: `${match[1]}. ${match[2].trim()}`
+        });
+      }
+    }
+    
+    if (options.length > 0) {
+      return options;
+    }
+  }
+  
+  return [];
+}
+
 export function generateDefaultMCQOptions(messageText: string): MCQOption[] {
   const lowerText = messageText.toLowerCase();
   
-  // FIRST: Always try to extract explicit numbered options (1='text' format)
-  // If options are provided, they MUST be shown regardless of keywords
+  // FIRST: Try to parse structured formats (JSON or plain-text blocks)
+  const structuredOptions = parseStructuredMCQ(messageText);
+  if (structuredOptions.length > 0) {
+    return structuredOptions;
+  }
+  
+  // FALLBACK: Try to extract explicit numbered options (legacy format)
   const extractedOptions = extractMCQOptions(messageText);
   if (extractedOptions.length > 0) {
     return extractedOptions; // Options provided - ALWAYS use them
