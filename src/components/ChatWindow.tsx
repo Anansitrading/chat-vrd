@@ -11,6 +11,8 @@ import { useSpeechToText } from '../hooks/useSpeechToText';
 import { MCQOption, stripMarkdownForTTS } from '../utils/messageClassifier';
 import { KIJKO_SYSTEM_PROMPT } from '../constants';
 import { useChat } from '../contexts/ChatContext';
+import { ProgressIndicator } from './ProgressIndicator';
+import { useProgress } from '../hooks/useProgress';
 
 interface ChatWindowProps {
   isTtsEnabled: boolean;
@@ -31,6 +33,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const { isListening, transcript, startListening, stopListening, setTranscript, isSttSupported } = useSpeechToText();
+  
+  // Progress tracking
+  const {
+    currentStep,
+    totalSteps,
+    currentStepLabel,
+    nextStepLabel,
+    percentage,
+    isVisible: isProgressVisible,
+    updateProgressByContent,
+    goToNextStep,
+    resetProgress
+  } = useProgress();
   
   // Auto-scroll refs and constants
   const SCROLL_THRESHOLD = 100;
@@ -79,6 +94,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           const newSessionId = await createNewChat();
           if (newSessionId) {
             setCurrentChatId(newSessionId);
+            resetProgress(); // Reset progress for new chat
             
             // Create welcome message and save it immediately
             const welcomeMessage: UIMessage = {
@@ -213,6 +229,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         msg.id === modelMessageId ? { ...msg, isStreaming: false } : msg
       ));
 
+      // Update progress based on assistant's response content
+      updateProgressByContent(fullResponse);
+
       if (isTtsEnabled) {
         speak(fullResponse);
       }
@@ -345,6 +364,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   return (
     <>
+      {/* Progress Indicator */}
+      <ProgressIndicator
+        currentStep={currentStep}
+        totalSteps={totalSteps}
+        currentStepLabel={currentStepLabel}
+        nextStepLabel={nextStepLabel}
+        percentage={percentage}
+        isVisible={isProgressVisible}
+      />
+      
       {/* Chat Messages */}
       <div className="flex-1 overflow-hidden">
         <div 
