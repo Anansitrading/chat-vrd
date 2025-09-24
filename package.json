@@ -12,14 +12,19 @@
     "@google/genai": "^1.16.0",
     "@google/generative-ai": "^0.24.1",
     "@heroicons/react": "^2.2.0",
+    "@react-pdf/renderer": "^4.3.1",
     "@supabase/supabase-js": "^2.57.4",
     "@types/react-router-dom": "^5.3.3",
+    "html2canvas": "^1.4.1",
+    "idb-keyval": "^6.2.2",
+    "jspdf": "^3.0.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.9.1",
     "remark-gfm": "^4.0.1",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "turndown": "^7.2.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
