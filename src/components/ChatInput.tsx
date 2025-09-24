@@ -5,7 +5,6 @@ import { SendIcon } from './icons/SendIcon';
 import { AttachmentIcon } from './icons/AttachmentIcon';
 import { XCircleIcon } from './icons/FileIcons';
 import { MicrophoneIcon } from './icons/MicrophoneIcon';
-import { WhisperVoiceInput } from './WhisperVoiceInput';
 
 interface ChatInputProps {
   onSendMessage: (text: string, attachments: Attachment[]) => void;
@@ -15,7 +14,6 @@ interface ChatInputProps {
   stopListening: () => void;
   transcript: string;
   isSttSupported: boolean;
-  useWhisper?: boolean; // Enable Whisper STT instead of Web Speech API
 }
 
 const MAX_FILES = 5;
@@ -37,7 +35,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     stopListening,
     transcript,
     isSttSupported,
-    useWhisper = true, // Default to Whisper for better mobile support
 }) => {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -145,33 +142,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               <AttachmentIcon className="w-5 h-5" />
             </button>
             
-            {/* Microphone Button - Either Whisper or Web Speech API */}
-            {useWhisper ? (
-              <WhisperVoiceInput 
-                onTranscript={(transcriptText) => {
-                  setText(prevText => prevText ? `${prevText} ${transcriptText}` : transcriptText);
-                }}
-                className="ml-2"
-                autoSubmit={false}
-              />
-            ) : (
-              <button
-                onClick={handleMicClick}
-                disabled={!isSttSupported}
-                className={`
-                  p-3 transition-all duration-200 rounded-lg focus-ring
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  ${isListening 
-                    ? 'text-red-400 bg-red-500/10 animate-glow-pulse' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                  }
-                `}
-                aria-label={isListening ? 'Stop listening' : 'Start listening'}
-                title={isSttSupported ? (isListening ? 'Stop listening' : 'Start listening') : 'Speech-to-text is not supported in your browser'}
-              >
-                <MicrophoneIcon className="w-5 h-5" />
-              </button>
-            )}
+            {/* Microphone Button */}
+            <button
+              onClick={handleMicClick}
+              disabled={!isSttSupported}
+              className={`
+                p-3 transition-all duration-200 rounded-lg focus-ring
+                disabled:opacity-50 disabled:cursor-not-allowed
+                ${isListening 
+                  ? 'text-red-400 bg-red-500/10 animate-glow-pulse' 
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }
+              `}
+              aria-label={isListening ? 'Stop listening' : 'Start listening'}
+              title={isSttSupported ? (isListening ? 'Stop listening' : 'Start listening') : 'Speech-to-text is not supported in your browser'}
+            >
+              <MicrophoneIcon className="w-5 h-5" />
+            </button>
             
             {/* Hidden File Input */}
             <input
