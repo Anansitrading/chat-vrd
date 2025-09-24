@@ -41,12 +41,12 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
   if (!isVisible) return null;
 
   const progressSize = isMobile ? 60 : 80;
+  // Add 10% of diameter as top offset: 8px for 80px desktop, 6px for 60px mobile
+  const topOffset = isMobile ? 'top-[76px]' : 'top-24';
+  
   const containerClasses = `
     fixed z-50 
-    ${isMobile 
-      ? 'bottom-4 right-4' 
-      : 'top-20 right-6 lg:right-8'
-    }
+    ${topOffset} right-4 lg:right-6
     flex flex-col items-center gap-2
     transition-all duration-300 ease-out
     ${isAnimating ? 'scale-105' : 'scale-100'}
@@ -73,53 +73,49 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
         </div>
       </div>
       
-      {/* Step Labels - Show only on desktop, below the ring */}
-      {!isMobile && (
-        <div className="text-center space-y-1 max-w-[120px] mt-2">
-          {/* Current Step */}
-          <div className="animate-slide-up">
-            <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">
-              Current
+      {/* Step Labels - Show below the ring, smaller on mobile */}
+      <div className={`text-center space-y-1 ${isMobile ? 'max-w-[80px]' : 'max-w-[120px]'} mt-2`}>
+        {/* Current Step */}
+        <div className="animate-slide-up">
+          <p className={`${isMobile ? 'text-[9px]' : 'text-[10px]'} text-gray-400 uppercase tracking-wider font-medium`}>
+            Current
+          </p>
+          <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} font-semibold text-gray-200 truncate drop-shadow`}>
+            {currentStepLabel}
+          </p>
+        </div>
+        
+        {/* Next Step - Only show if not on last step and on desktop */}
+        {!isMobile && nextStepLabel && percentage < 90 && (
+          <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">
+              Next
             </p>
-            <p className="text-xs font-semibold text-gray-200 truncate drop-shadow">
-              {currentStepLabel}
+            <p className="text-xs text-gray-400 truncate">
+              {nextStepLabel}
             </p>
           </div>
-          
-          {/* Next Step - Only show if not on last step */}
-          {nextStepLabel && percentage < 90 && (
-            <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">
-                Next
-              </p>
-              <p className="text-xs text-gray-400 truncate">
-                {nextStepLabel}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
       
-      {/* Visual indicator dots for steps - Only on desktop */}
-      {!isMobile && (
-        <div className="flex gap-1 mt-1">
-          {Array.from({ length: totalSteps }, (_, i) => (
-            <div
-              key={i}
-              className={`
-                h-1 transition-all duration-300
-                ${i < currentStep 
-                  ? 'w-2 bg-gradient-to-r from-purple-500 to-pink-500 opacity-80' 
-                  : i === currentStep
-                    ? 'w-4 bg-gradient-to-r from-purple-400 to-pink-400 animate-pulse'
-                    : 'w-1 bg-gray-600 opacity-50'
-                }
-                rounded-full
-              `}
-            />
-          ))}
-        </div>
-      )}
+      {/* Visual indicator dots for steps */}
+      <div className={`flex gap-1 ${isMobile ? 'mt-1' : 'mt-1'}`}>
+        {Array.from({ length: totalSteps }, (_, i) => (
+          <div
+            key={i}
+            className={`
+              ${isMobile ? 'h-[3px]' : 'h-1'} transition-all duration-300
+              ${i < currentStep 
+                ? `${isMobile ? 'w-1.5' : 'w-2'} bg-gradient-to-r from-purple-500 to-pink-500 opacity-80` 
+                : i === currentStep
+                  ? `${isMobile ? 'w-3' : 'w-4'} bg-gradient-to-r from-purple-400 to-pink-400 animate-pulse`
+                  : `${isMobile ? 'w-[3px]' : 'w-1'} bg-gray-600 opacity-50`
+              }
+              rounded-full
+            `}
+          />
+        ))}
+      </div>
     </div>
   );
 };
