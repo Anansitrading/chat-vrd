@@ -1,6 +1,7 @@
-import React from 'react';
-import { XMarkIcon, PlusIcon, ChatBubbleLeftIcon } from '@heroicons/react/24/outline';
+import React, { useState } from 'react';
+import { XMarkIcon, PlusIcon, ChatBubbleLeftIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useChat } from '../contexts/ChatContext';
+import { DocumentsSidebar } from './DocumentsSidebar';
 
 interface SessionItemProps {
   session: {
@@ -72,6 +73,8 @@ const LoadingSkeleton: React.FC = () => (
   </div>
 );
 
+type TabType = 'chat' | 'documents';
+
 export const ChatSidebar: React.FC = () => {
   const {
     sidebarOpen,
@@ -82,6 +85,8 @@ export const ChatSidebar: React.FC = () => {
     createNewChat,
     switchToSession,
   } = useChat();
+  
+  const [activeTab, setActiveTab] = useState<TabType>('chat');
   
   // DEBUG: Log sidebar render state
   console.log('[DEBUG] ChatSidebar render - sidebarOpen:', sidebarOpen);
@@ -112,12 +117,9 @@ export const ChatSidebar: React.FC = () => {
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-700/50">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center">
-                <ChatBubbleLeftIcon className="w-4 h-4 text-white" />
-              </div>
-              <h2 className="text-lg font-semibold text-white">Chat History</h2>
-            </div>
+            <h2 className="text-lg font-semibold text-white">
+              {activeTab === 'chat' ? 'Chat History' : 'Documents'}
+            </h2>
             <button
               onClick={() => setSidebarOpen(false)}
               className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
@@ -127,57 +129,111 @@ export const ChatSidebar: React.FC = () => {
             </button>
           </div>
 
-          {/* New Chat Button */}
-          <div className="p-4 border-b border-gray-700/30">
+          {/* Tab Navigation */}
+          <div className="flex border-b border-gray-700/30">
             <button
-              onClick={handleNewChat}
-              className="
-                w-full flex items-center justify-center space-x-2 
-                p-3 rounded-xl font-medium text-white
-                bg-gradient-to-r from-purple-600 to-blue-600 
-                hover:from-purple-700 hover:to-blue-700 
-                active:scale-[0.98] transition-all duration-150
-                shadow-lg hover:shadow-xl
-              "
+              onClick={() => setActiveTab('chat')}
+              className={`
+                flex-1 flex items-center justify-center gap-2 px-4 py-3
+                transition-all duration-200 relative
+                ${activeTab === 'chat' 
+                  ? 'text-purple-400' 
+                  : 'text-gray-400 hover:text-white'
+                }
+              `}
+              role="tab"
+              aria-selected={activeTab === 'chat'}
             >
-              <PlusIcon className="w-5 h-5" />
-              <span>New Chat</span>
+              <ChatBubbleLeftIcon className="w-4 h-4" />
+              <span className="text-sm font-medium">Chats</span>
+              {activeTab === 'chat' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={`
+                flex-1 flex items-center justify-center gap-2 px-4 py-3
+                transition-all duration-200 relative
+                ${activeTab === 'documents' 
+                  ? 'text-purple-400' 
+                  : 'text-gray-400 hover:text-white'
+                }
+              `}
+              role="tab"
+              aria-selected={activeTab === 'documents'}
+            >
+              <DocumentTextIcon className="w-4 h-4" />
+              <span className="text-sm font-medium">Documents</span>
+              {activeTab === 'documents' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500" />
+              )}
             </button>
           </div>
 
-          {/* Sessions List */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {loadingSessions ? (
-              <LoadingSkeleton />
-            ) : sessions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <ChatBubbleLeftIcon className="w-12 h-12 text-gray-500 mb-4" />
-                <p className="text-gray-400 text-sm">No previous conversations</p>
-                <p className="text-gray-500 text-xs mt-1">Start a new chat to begin!</p>
-              </div>
+          {/* Tab Content */}
+          <div className="flex-1 overflow-hidden">
+            {activeTab === 'chat' ? (
+              <>
+                {/* New Chat Button */}
+                <div className="p-4 border-b border-gray-700/30">
+                  <button
+                    onClick={handleNewChat}
+                    className="
+                      w-full flex items-center justify-center space-x-2 
+                      p-3 rounded-xl font-medium text-white
+                      bg-gradient-to-r from-purple-600 to-blue-600 
+                      hover:from-purple-700 hover:to-blue-700 
+                      active:scale-[0.98] transition-all duration-150
+                      shadow-lg hover:shadow-xl
+                    "
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                    <span>New Chat</span>
+                  </button>
+                </div>
+
+                {/* Sessions List */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {loadingSessions ? (
+                    <LoadingSkeleton />
+                  ) : sessions.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <ChatBubbleLeftIcon className="w-12 h-12 text-gray-500 mb-4" />
+                      <p className="text-gray-400 text-sm">No previous conversations</p>
+                      <p className="text-gray-500 text-xs mt-1">Start a new chat to begin!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                        Recent Chats
+                      </h3>
+                      {sessions.map((session) => (
+                        <SessionItem
+                          key={session.id}
+                          session={session}
+                          isActive={session.id === currentChatId}
+                          onClick={() => handleSessionClick(session.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             ) : (
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                  Recent Chats
-                </h3>
-                {sessions.map((session) => (
-                  <SessionItem
-                    key={session.id}
-                    session={session}
-                    isActive={session.id === currentChatId}
-                    onClick={() => handleSessionClick(session.id)}
-                  />
-                ))}
-              </div>
+              /* Documents Tab */
+              <DocumentsSidebar />
             )}
           </div>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-gray-700/30">
-            <p className="text-xs text-gray-500 text-center">
-              Chat history is automatically saved
-            </p>
-          </div>
+          {/* Footer - Only show for chat tab */}
+          {activeTab === 'chat' && (
+            <div className="p-4 border-t border-gray-700/30">
+              <p className="text-xs text-gray-500 text-center">
+                Chat history is automatically saved
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </>

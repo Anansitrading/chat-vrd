@@ -13,6 +13,7 @@ import { KIJKO_SYSTEM_PROMPT } from '../constants';
 import { useChat } from '../contexts/ChatContext';
 import { ProgressIndicator } from './ProgressIndicator';
 import { useProgress } from '../hooks/useProgress';
+import { DocumentExporter } from './DocumentExporter';
 
 interface ChatWindowProps {
   isTtsEnabled: boolean;
@@ -384,6 +385,22 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             userWasNearBottomRef.current = isUserNearBottom();
           }}
         >
+          {/* Show export button when VRD process is complete */}
+          {percentage >= 100 && messages.length > 10 && (
+            <div className="flex justify-center mb-6 p-4 bg-gray-800/50 rounded-lg">
+              <div className="text-center">
+                <p className="text-green-400 mb-3">✅ Your VRD is complete!</p>
+                <DocumentExporter 
+                  messages={messages}
+                  title="Video Requirements Document"
+                  onExportComplete={(docId) => {
+                    console.log('Document saved:', docId);
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          
           {messages.map((message) => {
             console.log('[DEBUG] Rendering message with onThumbsDown:', handleThumbsDown);
             return (
