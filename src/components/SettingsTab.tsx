@@ -15,7 +15,14 @@ const settingsSchema = z.object({
     .string()
     .min(10, 'System prompt must be at least 10 characters')
     .max(50000, 'System prompt must be less than 50,000 characters'),
-  selectedModel: z.enum(['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro'])
+  selectedModel: z.enum([
+    // Latest 2.5 Series
+    'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash-image',
+    // 2.0 Series 
+    'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.0-flash-experimental',
+    // Legacy 1.5 Series
+    'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'
+  ])
 });
 
 export const SettingsTab: React.FC = () => {

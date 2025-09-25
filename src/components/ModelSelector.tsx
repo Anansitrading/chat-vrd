@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDownIcon, SparklesIcon, CpuChipIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, SparklesIcon, CpuChipIcon, BeakerIcon, PhotoIcon, RocketLaunchIcon } from '@heroicons/react/24/outline';
 import { GeminiModel, GEMINI_MODELS, ModelOption } from '../types/settings';
 
 interface ModelSelectorProps {
@@ -43,59 +43,115 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   // Get selected model info
   const selectedModel = GEMINI_MODELS.find(model => model.value === value);
 
-  // Group models by category
-  const flashModels = GEMINI_MODELS.filter(model => model.category === 'flash');
-  const proModels = GEMINI_MODELS.filter(model => model.category === 'pro');
+  // Group models by generation and category
+  const modelsByGeneration = {
+    '2.5': GEMINI_MODELS.filter(model => model.generation === '2.5'),
+    '2.0': GEMINI_MODELS.filter(model => model.generation === '2.0'),
+    '1.5': GEMINI_MODELS.filter(model => model.generation === '1.5')
+  };
 
   const handleSelect = (model: GeminiModel) => {
     onChange(model);
     setIsOpen(false);
   };
 
-  const getCategoryIcon = (category: 'flash' | 'pro') => {
-    return category === 'flash' ? (
-      <SparklesIcon className="w-4 h-4 text-yellow-400" />
-    ) : (
-      <CpuChipIcon className="w-4 h-4 text-blue-400" />
-    );
+  const getCategoryIcon = (category: ModelOption['category']) => {
+    switch (category) {
+      case 'pro':
+        return <CpuChipIcon className="w-4 h-4 text-blue-400" />;
+      case 'flash':
+        return <SparklesIcon className="w-4 h-4 text-yellow-400" />;
+      case 'flash-lite':
+        return <RocketLaunchIcon className="w-4 h-4 text-green-400" />;
+      case 'experimental':
+        return <BeakerIcon className="w-4 h-4 text-purple-400" />;
+      case 'image':
+        return <PhotoIcon className="w-4 h-4 text-pink-400" />;
+      default:
+        return <SparklesIcon className="w-4 h-4 text-gray-400" />;
+    }
   };
 
-  const CategorySection: React.FC<{ models: ModelOption[]; title: string; category: 'flash' | 'pro' }> = ({
+  const getModelTip = (category: ModelOption['category']) => {
+    switch (category) {
+      case 'pro':
+        return 'Best for complex reasoning, analysis, and professional tasks requiring highest quality output.';
+      case 'flash':
+        return 'Perfect balance of speed and quality for most conversational AI applications.';
+      case 'flash-lite':
+        return 'Optimized for high-throughput scenarios where speed and cost efficiency are priorities.';
+      case 'experimental':
+        return 'Cutting-edge features but may have stability issues. Great for testing new capabilities.';
+      case 'image':
+        return 'Specialized for image understanding and analysis tasks with fast processing.';
+      default:
+        return 'General-purpose model suitable for various AI tasks.';
+    }
+  };
+
+  const GenerationSection: React.FC<{ models: ModelOption[]; generation: string }> = ({
     models,
-    title,
-    category
-  }) => (
-    <div>
-      <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-700">
-        {getCategoryIcon(category)}
-        {title}
-      </div>
-      {models.map((model) => (
-        <button
-          key={model.value}
-          onClick={() => handleSelect(model.value)}
-          className={`
-            w-full text-left px-4 py-3 hover:bg-gray-700/50 transition-colors
-            ${value === model.value ? 'bg-purple-600/20 text-purple-300' : 'text-gray-200'}
-          `}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{model.label}</span>
-                {value === model.value && (
-                  <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                )}
+    generation
+  }) => {
+    if (models.length === 0) return null;
+    
+    const generationLabels = {
+      '2.5': '2.5 Series - Latest & Most Powerful',
+      '2.0': '2.0 Series - Current Generation', 
+      '1.5': '1.5 Series - Legacy Support'
+    };
+    
+    return (
+      <div>
+        <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-300 bg-gray-800/50 border-b border-gray-700">
+          <span className="text-purple-400 font-bold">Gemini {generation}</span>
+          <span className="text-gray-500">•</span>
+          <span>{generationLabels[generation as keyof typeof generationLabels]}</span>
+        </div>
+        {models.map((model) => (
+          <button
+            key={model.value}
+            onClick={() => handleSelect(model.value)}
+            className={`
+              w-full text-left px-4 py-3 hover:bg-gray-700/50 transition-colors border-b border-gray-800/50 last:border-b-0
+              ${value === model.value ? 'bg-purple-600/20 text-purple-300' : 'text-gray-200'}
+            `}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  {getCategoryIcon(model.category)}
+                  <span className="font-medium">{model.label}</span>
+                  {value === model.value && (
+                    <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                  )}
+                </div>
+                <p className="text-sm text-gray-400 mb-2 line-clamp-2">
+                  {model.description}
+                </p>
+                <div className="flex items-center gap-3 text-xs text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <span className="w-1 h-1 bg-yellow-400 rounded-full"></span>
+                    Speed: {model.performance}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-1 h-1 bg-green-400 rounded-full"></span>
+                    Quality: {model.quality}
+                  </span>
+                  {model.contextLength && (
+                    <span className="flex items-center gap-1">
+                      <span className="w-1 h-1 bg-blue-400 rounded-full"></span>
+                      Context: {model.contextLength}
+                    </span>
+                  )}
+                </div>
               </div>
-              <p className="text-sm text-gray-400 mt-1 line-clamp-2">
-                {model.description}
-              </p>
             </div>
-          </div>
-        </button>
-      ))}
-    </div>
-  );
+          </button>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -160,35 +216,52 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               max-h-96 overflow-y-auto
             "
           >
-            <CategorySection 
-              models={flashModels} 
-              title="Flash Models" 
-              category="flash"
-            />
-            <CategorySection 
-              models={proModels} 
-              title="Pro Models" 
-              category="pro"
-            />
+            {Object.entries(modelsByGeneration).map(([generation, models]) => (
+              <GenerationSection
+                key={generation}
+                models={models}
+                generation={generation}
+              />
+            ))}
           </div>
         )}
       </div>
 
       {/* Model Information */}
       {selectedModel && (
-        <div className="p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
+        <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
+          <div className="flex items-center gap-3 mb-3">
             {getCategoryIcon(selectedModel.category)}
-            <span className="text-sm font-medium text-white">
-              {selectedModel.category === 'flash' ? 'Fast & Efficient' : 'Advanced Reasoning'}
-            </span>
+            <div>
+              <span className="text-sm font-medium text-white block">
+                Gemini {selectedModel.generation} • {selectedModel.category.charAt(0).toUpperCase() + selectedModel.category.slice(1).replace('-', ' ')}
+              </span>
+              <span className="text-xs text-gray-400">
+                Performance: {selectedModel.performance} • Quality: {selectedModel.quality}
+              </span>
+            </div>
           </div>
-          <p className="text-xs text-gray-400">
-            {selectedModel.category === 'flash' 
-              ? 'Optimized for speed and everyday tasks with lower latency'
-              : 'Designed for complex reasoning, analysis, and demanding tasks'
-            }
-          </p>
+          
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="bg-gray-700/30 rounded p-2">
+              <span className="text-gray-400 block">Speed</span>
+              <span className="text-white font-medium">{selectedModel.performance}</span>
+            </div>
+            <div className="bg-gray-700/30 rounded p-2">
+              <span className="text-gray-400 block">Quality</span>
+              <span className="text-white font-medium">{selectedModel.quality}</span>
+            </div>
+            {selectedModel.contextLength && (
+              <div className="bg-gray-700/30 rounded p-2 col-span-2">
+                <span className="text-gray-400 block">Context Length</span>
+                <span className="text-white font-medium">{selectedModel.contextLength}</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="mt-3 p-2 bg-blue-500/10 border border-blue-500/20 rounded text-xs text-blue-200">
+            <strong>💡 Tip:</strong> {getModelTip(selectedModel.category)}
+          </div>
         </div>
       )}
     </div>
