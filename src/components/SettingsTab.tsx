@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { CheckIcon, XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { SystemPromptEditor } from './SystemPromptEditor';
 import { ModelSelector } from './ModelSelector';
+import { Toast, ToastType } from './Toast';
 import { useSettings } from '../contexts/SettingsContext';
 import { SettingsFormData, GEMINI_MODELS } from '../types/settings';
 import { KIJKO_SYSTEM_PROMPT } from '../constants';
@@ -29,6 +30,12 @@ export const SettingsTab: React.FC = () => {
   const { settings, updateSettings, resetToDefaults, isLoading } = useSettings();
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [toast, setToast] = useState<{ type: ToastType; message: string; visible: boolean }>({ 
+    type: 'success', 
+    message: '', 
+    visible: false 
+  });
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const {
     handleSubmit,
@@ -71,12 +78,19 @@ export const SettingsTab: React.FC = () => {
       });
 
       if (success) {
+        setSaveSuccess(true);
+        setToast({ type: 'success', message: 'Settings saved successfully! Changes will apply to new conversations.', visible: true });
         setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
+        
+        // Reset success animation after delay
+        setTimeout(() => setSaveSuccess(false), 2000);
       } else {
+        setToast({ type: 'error', message: 'Failed to save settings. Please check your input and try again.', visible: true });
         setSaveMessage({ type: 'error', text: 'Failed to save settings. Please try again.' });
       }
     } catch (error) {
       console.error('Error saving settings:', error);
+      setToast({ type: 'error', message: 'An unexpected error occurred while saving settings.', visible: true });
       setSaveMessage({ type: 'error', text: 'An error occurred while saving settings.' });
     } finally {
       setIsSaving(false);
@@ -87,9 +101,11 @@ export const SettingsTab: React.FC = () => {
     if (window.confirm('Are you sure you want to reset all settings to default values? This action cannot be undone.')) {
       try {
         await resetToDefaults();
+        setToast({ type: 'success', message: 'Settings have been reset to default values.', visible: true });
         setSaveMessage({ type: 'success', text: 'Settings reset to default values.' });
       } catch (error) {
         console.error('Error resetting settings:', error);
+        setToast({ type: 'error', message: 'Failed to reset settings. Please try again.', visible: true });
         setSaveMessage({ type: 'error', text: 'Failed to reset settings.' });
       }
     }
@@ -100,8 +116,9 @@ export const SettingsTab: React.FC = () => {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-4">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 max-w-4xl">
+    <div className="h-full flex flex-col">
+      <div className="flex-1 overflow-y-auto p-4">
+        <form id="settings-form" onSubmit={handleSubmit(onSubmit)} className="space-y-8 max-w-4xl pb-8">
         {/* Header */}
         <div className="border-b border-gray-700 pb-4">
           <h2 className="text-2xl font-bold text-white mb-2">Settings</h2>
@@ -149,12 +166,19 @@ export const SettingsTab: React.FC = () => {
           />
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-700">
+        {/* Spacer for fixed footer */}
+        <div className="h-32"></div>
+        </form>
+      </div>
+      
+      {/* Fixed Footer with Action Buttons */}
+      <div className="border-t border-gray-700 bg-gray-900/95 backdrop-blur p-4">
+        <div className="flex flex-col sm:flex-row gap-3 max-w-4xl">
           {/* Save & Cancel */}
           <div className="flex gap-3 flex-1">
             <button
               type="submit"
+              form="settings-form"
               disabled={!isDirty || !isValid || isLoading || isSaving}
               className="
                 flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium
@@ -169,6 +193,11 @@ export const SettingsTab: React.FC = () => {
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   Saving...
+                </>
+              ) : saveSuccess ? (
+                <>
+                  <CheckIcon className="w-4 h-4 text-green-300" />
+                  <span className="text-green-300">Saved!</span>
                 </>
               ) : (
                 <>
@@ -216,14 +245,22 @@ export const SettingsTab: React.FC = () => {
             Reset to Defaults
           </button>
         </div>
-
+        
         {/* Status Info */}
-        <div className="text-xs text-gray-500 space-y-1">
+        <div className="text-xs text-gray-500 space-y-1 mt-3">
           <p>• Settings are automatically saved to your browser's local storage</p>
           <p>• Changes will apply to new conversations</p>
           <p>• Current conversations will continue using previous settings</p>
         </div>
-      </form>
+      </div>
+      
+      {/* Toast Notification */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.visible}
+        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
     </div>
   );
 };
