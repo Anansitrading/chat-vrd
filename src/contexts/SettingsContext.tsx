@@ -68,14 +68,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     loadInitialSettings();
   }, []);
 
-  // Save settings whenever they change (debounced)
-  useEffect(() => {
-    const saveTimer = setTimeout(() => {
-      saveSettings(settings);
-    }, 500);
-
-    return () => clearTimeout(saveTimer);
-  }, [settings]);
+  // Note: Auto-save removed - settings are only saved when user explicitly clicks Save
 
   // Context value methods
   const updateSystemPrompt = async (prompt: string): Promise<boolean> => {

@@ -174,7 +174,7 @@ export const SettingsTab: React.FC = () => {
       {/* Fixed Footer with Action Buttons */}
       <div className="border-t border-gray-700 bg-gray-900/95 backdrop-blur p-4">
         <div className="flex flex-col sm:flex-row gap-3 max-w-4xl">
-          {/* Save & Cancel */}
+          {/* Action Buttons */}
           <div className="flex gap-3 flex-1">
             <button
               type="submit"
@@ -207,43 +207,25 @@ export const SettingsTab: React.FC = () => {
               )}
             </button>
 
+            {/* Reset to Defaults - moved from right side for better visibility */}
             <button
               type="button"
-              onClick={() => {
-                setValue('systemPrompt', settings.systemPrompt);
-                setValue('selectedModel', settings.selectedModel);
-              }}
-              disabled={!isDirty || isLoading || isSaving}
+              onClick={handleReset}
+              disabled={isLoading || isSaving}
               className="
                 flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium
-                bg-gray-700 text-gray-200 hover:bg-gray-600
-                disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed
-                transition-colors duration-200
+                bg-red-600/20 text-red-400 border border-red-600/30
+                hover:bg-red-600/30 hover:border-red-600/50
+                disabled:bg-gray-800 disabled:text-gray-500 disabled:border-gray-700
+                disabled:cursor-not-allowed
+                transition-all duration-200
                 flex-1 sm:flex-initial
               "
             >
-              <XMarkIcon className="w-4 h-4" />
-              Cancel
+              <ExclamationTriangleIcon className="w-4 h-4" />
+              Reset to Defaults
             </button>
           </div>
-
-          {/* Reset to Defaults */}
-          <button
-            type="button"
-            onClick={handleReset}
-            disabled={isLoading || isSaving}
-            className="
-              flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium
-              bg-red-600/20 text-red-400 border border-red-600/30
-              hover:bg-red-600/30 hover:border-red-600/50
-              disabled:bg-gray-800 disabled:text-gray-500 disabled:border-gray-700
-              disabled:cursor-not-allowed
-              transition-all duration-200
-            "
-          >
-            <ExclamationTriangleIcon className="w-4 h-4" />
-            Reset to Defaults
-          </button>
         </div>
         
         {/* Status Info */}
