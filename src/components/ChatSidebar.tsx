@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { XMarkIcon, PlusIcon, ChatBubbleLeftIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PlusIcon, ChatBubbleLeftIcon, DocumentTextIcon, CogIcon } from '@heroicons/react/24/outline';
 import { useChat } from '../contexts/ChatContext';
 import { DocumentsSidebar } from './DocumentsSidebar';
+import { SettingsTab } from './SettingsTab';
 
 interface SessionItemProps {
   session: {
@@ -73,7 +74,7 @@ const LoadingSkeleton: React.FC = () => (
   </div>
 );
 
-type TabType = 'chat' | 'documents';
+type TabType = 'chat' | 'documents' | 'settings';
 
 export const ChatSidebar: React.FC = () => {
   const {
@@ -118,7 +119,7 @@ export const ChatSidebar: React.FC = () => {
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-700/50">
             <h2 className="text-lg font-semibold text-white">
-              {activeTab === 'chat' ? 'Chat History' : 'Documents'}
+              {activeTab === 'chat' ? 'Chat History' : activeTab === 'documents' ? 'Documents' : 'Settings'}
             </h2>
             <button
               onClick={() => setSidebarOpen(false)}
@@ -134,7 +135,7 @@ export const ChatSidebar: React.FC = () => {
             <button
               onClick={() => setActiveTab('chat')}
               className={`
-                flex-1 flex items-center justify-center gap-2 px-4 py-3
+                flex-1 flex items-center justify-center gap-1 px-3 py-3
                 transition-all duration-200 relative
                 ${activeTab === 'chat' 
                   ? 'text-purple-400' 
@@ -145,7 +146,7 @@ export const ChatSidebar: React.FC = () => {
               aria-selected={activeTab === 'chat'}
             >
               <ChatBubbleLeftIcon className="w-4 h-4" />
-              <span className="text-sm font-medium">Chats</span>
+              <span className="text-xs font-medium">Chats</span>
               {activeTab === 'chat' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500" />
               )}
@@ -153,7 +154,7 @@ export const ChatSidebar: React.FC = () => {
             <button
               onClick={() => setActiveTab('documents')}
               className={`
-                flex-1 flex items-center justify-center gap-2 px-4 py-3
+                flex-1 flex items-center justify-center gap-1 px-3 py-3
                 transition-all duration-200 relative
                 ${activeTab === 'documents' 
                   ? 'text-purple-400' 
@@ -164,8 +165,27 @@ export const ChatSidebar: React.FC = () => {
               aria-selected={activeTab === 'documents'}
             >
               <DocumentTextIcon className="w-4 h-4" />
-              <span className="text-sm font-medium">Documents</span>
+              <span className="text-xs font-medium">Documents</span>
               {activeTab === 'documents' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`
+                flex-1 flex items-center justify-center gap-1 px-3 py-3
+                transition-all duration-200 relative
+                ${activeTab === 'settings' 
+                  ? 'text-purple-400' 
+                  : 'text-gray-400 hover:text-white'
+                }
+              `}
+              role="tab"
+              aria-selected={activeTab === 'settings'}
+            >
+              <CogIcon className="w-4 h-4" />
+              <span className="text-xs font-medium">Settings</span>
+              {activeTab === 'settings' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500" />
               )}
             </button>
@@ -220,9 +240,12 @@ export const ChatSidebar: React.FC = () => {
                   )}
                 </div>
               </>
-            ) : (
+            ) : activeTab === 'documents' ? (
               /* Documents Tab */
               <DocumentsSidebar />
+            ) : (
+              /* Settings Tab */
+              <SettingsTab />
             )}
           </div>
 

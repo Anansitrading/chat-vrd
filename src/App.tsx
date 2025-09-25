@@ -8,6 +8,7 @@ import EnhancedChatMessage from './components/EnhancedChatMessage';
 import { ChatSidebar } from './components/ChatSidebar';
 import { ChatWindow } from './components/ChatWindow';
 import { ChatProvider, useChat } from './contexts/ChatContext';
+import { SettingsProvider } from './contexts/SettingsContext';
 import { UIMessage, Attachment } from './types';
 import { startKijkoChat, sendMessageToKijkoStream } from './services/geminiService';
 import { perplexityService } from './services/perplexityService';
@@ -37,12 +38,14 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Main App component with ChatProvider
+// Main App component with providers
 const App: React.FC = () => {
   return (
-    <ChatProvider>
-      <AppContent />
-    </ChatProvider>
+    <SettingsProvider>
+      <ChatProvider>
+        <AppContent />
+      </ChatProvider>
+    </SettingsProvider>
   );
 };
 

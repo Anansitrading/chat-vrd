@@ -11,6 +11,7 @@ import { useSpeechToText } from '../hooks/useSpeechToText';
 import { MCQOption, stripMarkdownForTTS } from '../utils/messageClassifier';
 import { KIJKO_SYSTEM_PROMPT } from '../constants';
 import { useChat } from '../contexts/ChatContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { ProgressIndicator } from './ProgressIndicator';
 import { useProgress } from '../hooks/useProgress';
 import { DocumentExporter } from './DocumentExporter';
@@ -29,6 +30,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   stopTts 
 }) => {
   const { currentChatId, setCurrentChatId, createNewChat, loadChatSessions } = useChat();
+  const { settings } = useSettings();
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -81,7 +83,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   // Initialize chat and session
   useEffect(() => {
     const initializeChat = async () => {
-      const newChat = startKijkoChat();
+      const newChat = startKijkoChat(settings.selectedModel, settings.systemPrompt);
       setChat(newChat);
 
       // If no current chat ID, create a new session
@@ -129,7 +131,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     };
 
     initializeChat();
-  }, []);
+  }, [settings.selectedModel, settings.systemPrompt]);
 
   // Load messages when currentChatId changes
   useEffect(() => {
@@ -217,7 +219,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     setMessages(prev => [...prev, modelMessage]);
 
     try {
-      const stream = await sendMessageToKijkoStream(chat, text, attachments);
+      const stream = await sendMessageToKijkoStream(chat, text, attachments, 0, settings.selectedModel, settings.systemPrompt);
       let fullResponse = '';
       for await (const chunk of stream) {
         fullResponse += chunk.text;
@@ -252,7 +254,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [chat, isTtsEnabled, speak, stopTts, isListening, stopListening, setTranscript, currentChatId]);
+  }, [chat, isTtsEnabled, speak, stopTts, isListening, stopListening, setTranscript, currentChatId, settings.selectedModel, settings.systemPrompt]);
 
   // Handle MCQ option selection
   const handleOptionSelect = useCallback(async (option: MCQOption) => {

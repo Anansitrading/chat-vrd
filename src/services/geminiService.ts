@@ -2,6 +2,7 @@
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { KIJKO_SYSTEM_PROMPT } from '../constants';
 import { Attachment, MessagePart } from '../types';
+import { GeminiModel } from '../types/settings';
 
 // Get API keys with fallback support
 const getApiKeys = () => {
@@ -31,12 +32,15 @@ const switchToNextKey = () => {
   console.log(`Switched to backup API key ${currentKeyIndex + 1}`);
 };
 
-export function startKijkoChat(): Chat {
+export function startKijkoChat(model?: GeminiModel, systemPrompt?: string): Chat {
   try {
+    const selectedModel = model || 'gemini-2.5-flash';
+    const selectedPrompt = systemPrompt || KIJKO_SYSTEM_PROMPT;
+    
     const chat = ai.chats.create({
-      model: 'gemini-2.5-flash',
+      model: selectedModel,
       config: {
-        systemInstruction: KIJKO_SYSTEM_PROMPT,
+        systemInstruction: selectedPrompt,
       },
     });
     return chat;
@@ -44,7 +48,7 @@ export function startKijkoChat(): Chat {
     console.error('Failed to create chat with current API key:', error);
     if (apiKeys.length > 1) {
       switchToNextKey();
-      return startKijkoChat();
+      return startKijkoChat(model, systemPrompt);
     }
     throw error;
   }
@@ -63,7 +67,9 @@ export async function sendMessageToKijkoStream(
   chat: Chat, 
   text: string, 
   attachments: Attachment[],
-  retryCount = 0
+  retryCount = 0,
+  model?: GeminiModel,
+  systemPrompt?: string
 ): Promise<AsyncGenerator<GenerateContentResponse>> {
   try {
     const parts: MessagePart[] = attachments.map(fileToGenerativePart);
@@ -88,9 +94,9 @@ export async function sendMessageToKijkoStream(
     // If we have backup keys and haven't exceeded retry attempts
     if (apiKeys.length > 1 && retryCount < apiKeys.length - 1) {
       switchToNextKey();
-      // Create new chat with the new API key
-      const newChat = startKijkoChat();
-      return sendMessageToKijkoStream(newChat, text, attachments, retryCount + 1);
+      // Create new chat with the new API key and same settings
+      const newChat = startKijkoChat(model, systemPrompt);
+      return sendMessageToKijkoStream(newChat, text, attachments, retryCount + 1, model, systemPrompt);
     }
     
     throw error;
