@@ -17,6 +17,8 @@ const settingsSchema = z.object({
     .min(10, 'System prompt must be at least 10 characters')
     .max(50000, 'System prompt must be less than 50,000 characters'),
   selectedModel: z.enum([
+    // Live Models
+    'gemini-live-2.5-flash-preview-native-audio-09-2025',
     // Latest 2.5 Series
     'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash-image',
     // 2.0 Series 
