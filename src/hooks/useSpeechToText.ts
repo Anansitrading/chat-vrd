@@ -61,7 +61,7 @@ const getSpeechRecognition = () => {
   return undefined;
 };
 
-export const useSpeechToText = () => {
+export const useSpeechToText = (language = 'nl-NL') => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   // Use the defined `SpeechRecognition` interface as the type for the ref.
@@ -85,7 +85,7 @@ export const useSpeechToText = () => {
     const recognition = new SpeechRecognitionAPI();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.lang = language || navigator.language || 'nl-NL';
 
     recognition.onstart = () => {
       setIsListening(true);

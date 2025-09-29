@@ -32,6 +32,17 @@ const switchToNextKey = () => {
   console.log(`Switched to backup API key ${currentKeyIndex + 1}`);
 };
 
+/**
+ * Creates a new chat instance using the traditional Gemini API (non-real-time).
+ * This function is used for standard request-response interactions with Gemini models.
+ * 
+ * For real-time conversational AI with integrated STT/LLM/TTS, use the Gemini Live API
+ * via the useGeminiLive hook instead.
+ * 
+ * @param model - The Gemini model to use (defaults to 'gemini-2.5-flash')
+ * @param systemPrompt - Optional system prompt for the chat session
+ * @returns A Chat instance for traditional message streaming
+ */
 export function startKijkoChat(model?: GeminiModel, systemPrompt?: string): Chat {
   try {
     const selectedModel = model || 'gemini-2.5-flash';
@@ -63,6 +74,21 @@ const fileToGenerativePart = (file: Attachment): MessagePart => {
   };
 };
 
+/**
+ * Sends a message to a Gemini chat session and returns streaming responses (non-real-time).
+ * This function handles traditional message-response patterns with file attachments and YouTube URL detection.
+ * 
+ * For real-time conversational AI with live audio streaming, use the Gemini Live API
+ * via the useGeminiLive hook instead.
+ * 
+ * @param chat - The chat instance created by startKijkoChat
+ * @param text - The message text to send
+ * @param attachments - File attachments (images, videos, audio, documents)
+ * @param retryCount - Internal retry counter for API key rotation
+ * @param model - Optional model override
+ * @param systemPrompt - Optional system prompt override
+ * @returns AsyncGenerator yielding streaming response chunks
+ */
 export async function sendMessageToKijkoStream(
   chat: Chat, 
   text: string, 

@@ -8,6 +8,7 @@ import { perplexityService } from '../services/perplexityService';
 import { supabaseService } from '../services/supabaseService';
 import { useTextToSpeech } from '../hooks/useTextToSpeech';
 import { useSpeechToText } from '../hooks/useSpeechToText';
+import { useGeminiLive } from '../hooks/useGeminiLive';
 import { MCQOption, stripMarkdownForTTS } from '../utils/messageClassifier';
 import { KIJKO_SYSTEM_PROMPT } from '../constants';
 import { useChat } from '../contexts/ChatContext';
@@ -35,7 +36,30 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const { isListening, transcript, startListening, stopListening, setTranscript, isSttSupported } = useSpeechToText();
+  const [currentLiveMessageId, setCurrentLiveMessageId] = useState<string | null>(null);
+  const { isListening, transcript, startListening, stopListening, setTranscript, isSttSupported } = useSpeechToText('nl-NL');
+
+  // Gemini Live integration
+  const isGeminiLiveMode = settings.selectedModel === 'gemini-live-2.5-flash-preview-native-audio-09-2025';
+  const [liveAudioEnabled, setLiveAudioEnabled] = useState(true);
+  
+  const {
+    isConnected: isLiveConnected,
+    isListening: isLiveListening,
+    llmResponse: liveLlmResponse,
+    interimTranscript: liveInterimTranscript,
+    finalTranscript: liveFinalTranscript,
+    startListening: startGeminiLive,
+    stopListening: stopGeminiLive,
+    sendText: sendGeminiLiveText,
+    connect: connectLive,
+    disconnect: disconnectLive,
+    isSupported: isGeminiLiveSupported,
+  } = useGeminiLive({
+    audioOutput: liveAudioEnabled,
+    inputLang: 'nl-NL',
+    systemPrompt: settings.systemPrompt,
+  });
   
   // Progress tracking
   const {
@@ -133,6 +157,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     initializeChat();
   }, [settings.selectedModel, settings.systemPrompt]);
 
+  // Connect/disconnect Gemini Live when switching models
+  useEffect(() => {
+    if (isGeminiLiveMode) {
+      connectLive();
+    } else if (isLiveConnected) {
+      disconnectLive();
+    }
+    
+    return () => {
+      if (isLiveConnected) {
+        disconnectLive();
+      }
+    };
+  }, [isGeminiLiveMode, connectLive, disconnectLive, isLiveConnected]);
+
   // Load messages when currentChatId changes
   useEffect(() => {
     const loadMessages = async () => {
@@ -188,6 +227,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [currentChatId]);
 
+  // Handle live response updates
+  useEffect(() => {
+    if (isGeminiLiveMode && currentLiveMessageId && liveLlmResponse) {
+      setMessages(prev => prev.map(msg => 
+        msg.id === currentLiveMessageId 
+          ? { ...msg, text: liveLlmResponse, isStreaming: liveLlmResponse === '' }
+          : msg
+      ));
+    }
+  }, [isGeminiLiveMode, currentLiveMessageId, liveLlmResponse]);
+
   const handleSendMessage = useCallback(async (text: string, attachments: Attachment[]) => {
     if (!text.trim() && attachments.length === 0) return;
     if (!chat) return;
@@ -219,30 +269,37 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     setMessages(prev => [...prev, modelMessage]);
 
     try {
-      const stream = await sendMessageToKijkoStream(chat, text, attachments, 0, settings.selectedModel, settings.systemPrompt);
-      let fullResponse = '';
-      for await (const chunk of stream) {
-        fullResponse += chunk.text;
+      if (isGeminiLiveMode) {
+        // Live mode: send text into the live session
+        sendGeminiLiveText(text);
+        setCurrentLiveMessageId(modelMessageId);
+        // Response updates will be handled by the useEffect above
+      } else {
+        const stream = await sendMessageToKijkoStream(chat, text, attachments, 0, settings.selectedModel, settings.systemPrompt);
+        let fullResponse = '';
+        for await (const chunk of stream) {
+          fullResponse += chunk.text;
+          setMessages(prev => prev.map(msg => 
+            msg.id === modelMessageId ? { ...msg, text: fullResponse } : msg
+          ));
+        }
+
         setMessages(prev => prev.map(msg => 
-          msg.id === modelMessageId ? { ...msg, text: fullResponse } : msg
+          msg.id === modelMessageId ? { ...msg, isStreaming: false } : msg
         ));
-      }
 
-      setMessages(prev => prev.map(msg => 
-        msg.id === modelMessageId ? { ...msg, isStreaming: false } : msg
-      ));
+        // Update progress based on assistant's response content
+        updateProgressByContent(fullResponse);
 
-      // Update progress based on assistant's response content
-      updateProgressByContent(fullResponse);
-
-      if (isTtsEnabled) {
-        speak(fullResponse);
-      }
-      
-      // Save messages to Supabase if available
-      if (currentChatId && supabaseService.isAvailable()) {
-        await supabaseService.addMessage(currentChatId, text, 'user');
-        await supabaseService.addMessage(currentChatId, fullResponse, 'assistant');
+        if (isTtsEnabled) {
+          speak(fullResponse);
+        }
+        
+        // Save messages to Supabase if available
+        if (currentChatId && supabaseService.isAvailable()) {
+          await supabaseService.addMessage(currentChatId, text, 'user');
+          await supabaseService.addMessage(currentChatId, fullResponse, 'assistant');
+        }
       }
 
     } catch (error) {
@@ -254,7 +311,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [chat, isTtsEnabled, speak, stopTts, isListening, stopListening, setTranscript, currentChatId, settings.selectedModel, settings.systemPrompt]);
+  }, [chat, isTtsEnabled, speak, stopTts, isListening, stopListening, setTranscript, currentChatId, settings.selectedModel, settings.systemPrompt, isGeminiLiveMode, sendGeminiLiveText]);
 
   // Handle MCQ option selection
   const handleOptionSelect = useCallback(async (option: MCQOption) => {
@@ -445,6 +502,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         stopListening={stopListening}
         transcript={transcript}
         isSttSupported={isSttSupported}
+        // Gemini Live props
+        isGeminiLiveMode={isGeminiLiveMode}
+        startGeminiLive={startGeminiLive}
+        stopGeminiLive={stopGeminiLive}
+        isGeminiLiveListening={isLiveListening}
+        isGeminiLiveSupported={isGeminiLiveSupported}
       />
     </>
   );

@@ -57,6 +57,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
   const getCategoryIcon = (category: ModelOption['category']) => {
     switch (category) {
+      case 'live':
+        return <div className="w-4 h-4 text-red-400 flex items-center justify-center">🎤</div>;
       case 'pro':
         return <CpuChipIcon className="w-4 h-4 text-blue-400" />;
       case 'flash':
@@ -74,6 +76,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
   const getModelTip = (category: ModelOption['category']) => {
     switch (category) {
+      case 'live':
+        return 'Real-time conversational AI with integrated speech-to-text, language processing, and text-to-speech streaming. Perfect for natural voice conversations.';
       case 'pro':
         return 'Best for complex reasoning, analysis, and professional tasks requiring highest quality output.';
       case 'flash':

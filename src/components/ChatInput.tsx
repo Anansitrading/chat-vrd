@@ -14,6 +14,12 @@ interface ChatInputProps {
   stopListening: () => void;
   transcript: string;
   isSttSupported: boolean;
+  // Gemini Live props
+  isGeminiLiveMode?: boolean;
+  startGeminiLive?: () => void;
+  stopGeminiLive?: () => void;
+  isGeminiLiveListening?: boolean;
+  isGeminiLiveSupported?: boolean;
 }
 
 const MAX_FILES = 5;
@@ -35,6 +41,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     stopListening,
     transcript,
     isSttSupported,
+    // Gemini Live props
+    isGeminiLiveMode = false,
+    startGeminiLive,
+    stopGeminiLive,
+    isGeminiLiveListening = false,
+    isGeminiLiveSupported = false,
 }) => {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -98,10 +110,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleMicClick = () => {
-      if (isListening) {
-          stopListening();
+      if (isGeminiLiveMode) {
+          // Gemini Live mode
+          if (isGeminiLiveListening) {
+              stopGeminiLive?.();
+          } else {
+              startGeminiLive?.();
+          }
       } else {
-          startListening();
+          // Traditional Web Speech API mode
+          if (isListening) {
+              stopListening();
+          } else {
+              startListening();
+          }
       }
   }
 
@@ -145,17 +167,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             {/* Microphone Button */}
             <button
               onClick={handleMicClick}
-              disabled={!isSttSupported}
+              disabled={isGeminiLiveMode ? !isGeminiLiveSupported : !isSttSupported}
               className={`
                 p-3 transition-all duration-200 rounded-lg focus-ring
                 disabled:opacity-50 disabled:cursor-not-allowed
-                ${isListening 
+                ${(isGeminiLiveMode ? isGeminiLiveListening : isListening)
                   ? 'text-red-400 bg-red-500/10 animate-glow-pulse' 
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
                 }
+                ${isGeminiLiveMode ? 'ring-2 ring-blue-500/30' : ''}
               `}
-              aria-label={isListening ? 'Stop listening' : 'Start listening'}
-              title={isSttSupported ? (isListening ? 'Stop listening' : 'Start listening') : 'Speech-to-text is not supported in your browser'}
+              aria-label={(isGeminiLiveMode ? isGeminiLiveListening : isListening) ? 'Stop listening' : 'Start listening'}
+              title={
+                isGeminiLiveMode 
+                  ? (isGeminiLiveSupported 
+                      ? (isGeminiLiveListening ? 'Stop Gemini Live conversation' : 'Start Gemini Live conversation')
+                      : 'Gemini Live is not supported in your browser')
+                  : (isSttSupported 
+                      ? (isListening ? 'Stop listening' : 'Start listening') 
+                      : 'Speech-to-text is not supported in your browser')
+              }
             >
               <MicrophoneIcon className="w-5 h-5" />
             </button>
@@ -176,11 +207,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isListening ? "🎤 Listening..." : "Send message..."}
+              placeholder={
+                isGeminiLiveMode 
+                  ? (isGeminiLiveListening ? "🎤 Live conversation..." : "Send message or start live conversation...")
+                  : (isListening ? "🎤 Listening..." : "Send message...")
+              }
               className={`
                 flex-1 bg-transparent p-3 resize-none outline-none max-h-40
                 text-white placeholder:text-gray-500
-                ${isListening ? 'placeholder:animate-pulse' : ''}
+                ${(isGeminiLiveMode ? isGeminiLiveListening : isListening) ? 'placeholder:animate-pulse' : ''}
               `}
               rows={1}
               disabled={isLoading}

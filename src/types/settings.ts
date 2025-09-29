@@ -1,4 +1,6 @@
 export type GeminiModel = 
+  // Live Real-Time Models (Experimental)
+  | 'gemini-live-2.5-flash-preview-native-audio-09-2025'
   // Latest 2.5 Series (Most Powerful)
   | 'gemini-2.5-pro'
   | 'gemini-2.5-flash'
@@ -17,7 +19,7 @@ export interface ModelOption {
   value: GeminiModel;
   label: string;
   description: string;
-  category: 'pro' | 'flash' | 'flash-lite' | 'experimental' | 'image';
+  category: 'live' | 'pro' | 'flash' | 'flash-lite' | 'experimental' | 'image';
   generation: '1.5' | '2.0' | '2.5';
   contextLength?: string;
   performance: 'fastest' | 'fast' | 'medium' | 'high';
@@ -25,6 +27,17 @@ export interface ModelOption {
 }
 
 export const GEMINI_MODELS: ModelOption[] = [
+  // Live Real-Time Models - Experimental
+  {
+    value: 'gemini-live-2.5-flash-preview-native-audio-09-2025',
+    label: 'Gemini Live 2.5 Flash Native Audio',
+    description: 'Real-time native audio conversational AI with ultra-low latency',
+    category: 'live',
+    generation: '2.5',
+    contextLength: '1M+ tokens',
+    performance: 'fastest',
+    quality: 'high'
+  },
   // Latest 2.5 Series - Most Powerful
   {
     value: 'gemini-2.5-pro',
