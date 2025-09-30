@@ -105,8 +105,33 @@ export default async function handler(
       transcript: result.results.channels[0].alternatives[0].transcript,
     });
 
-  } catch (error) {
-    console.error('Server error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+  } catch (error: any) {
+    // Comprehensive debug logging
+    console.error('========== DEEPGRAM API ERROR ===========');
+    console.error('Error Message:', error?.message || error);
+    console.error('Stack Trace:', error?.stack || 'No stack available');
+    console.error('Request Body:', req.body);
+    console.error('Deepgram Response:', error?.response || 'No response');
+    console.error('Environment Keys:', Object.keys(process.env));
+    console.error('DEEPGRAM_API_KEY exists:', !!process.env.DEEPGRAM_API_KEY);
+    console.error('==========================================');
+
+    // Return detailed debug info in response (REMOVE IN PRODUCTION)
+    return res.status(500).json({
+      error: 'Internal server error',
+      debug: {
+        message: error?.message || String(error),
+        stack: error?.stack || 'No stack trace',
+        deepgramError: error?.response || error?.error || null,
+        requestPayload: {
+          hasAudioBase64: !!req.body?.audioBase64,
+          audioBase64Length: req.body?.audioBase64?.length || 0,
+        },
+        environment: {
+          hasDeepgramKey: !!process.env.DEEPGRAM_API_KEY,
+          envKeys: Object.keys(process.env).filter(k => k.includes('DEEPGRAM')),
+        },
+      },
+    });
   }
 }
