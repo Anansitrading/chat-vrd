@@ -1,16 +1,4 @@
-# Enhanced Deepgram STT Specification for Language Detection with Gemini Live Integration
-
-Based on the codebase analysis and research, here's the comprehensive specification with implementation details for integrating Deepgram language detection with Gemini Live API language configuration.
-
-## Critical Implementation Gap Identified
-
-The original specification missed a **crucial integration point**: Deepgram language detection must dynamically set the `languageCode` in Gemini Live's `speechConfig` to ensure proper bidirectional speech recognition.[1][2][3][4]
-
-## Enhanced Architecture Overview
-
-The implementation requires a two-stage approach:
-1. **Stage 1**: Deepgram detects language from initial audio sample (1-2 seconds)
-2. **Stage 2**: Pass detected language to Gemini Live session configuration for proper STT
+# Backend API Implementation
 
 ## Complete Implementation Guide
 
@@ -119,3 +107,13 @@ export default async function handler(
 
 **Key Enhancement**: Added language mapping from Deepgram codes to Gemini Live BCP-47 codes.[4][1]
 
+## Environment Variables Setup
+
+Add to Vercel dashboard (already configured according to spec):
+
+```bash
+DEEPGRAM_API_KEY=your_deepgram_key_here
+GEMINI_API_KEY=your_gemini_key_here
+```
+
+Access in Vercel functions via `process.env.DEEPGRAM_API_KEY`.[1][2]
