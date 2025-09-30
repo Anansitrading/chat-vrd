@@ -18,6 +18,13 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Defensive check for API key
+  const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
+  if (!deepgramApiKey) {
+    console.error('DEEPGRAM_API_KEY is not configured');
+    return res.status(500).json({ error: 'Server configuration error: Missing API key' });
+  }
+
   try {
     const { audioBase64 } = req.body;
 
@@ -25,11 +32,15 @@ export default async function handler(
       return res.status(400).json({ error: 'Audio data required' });
     }
 
-    // Initialize Deepgram client with Vercel environment variable
-    const deepgram = createClient(process.env.DEEPGRAM_API_KEY!);
+    // Initialize Deepgram client
+    const deepgram = createClient(deepgramApiKey);
 
     // Convert base64 to buffer
     const audioBuffer = Buffer.from(audioBase64, 'base64');
+
+    if (audioBuffer.length === 0) {
+      return res.status(400).json({ error: 'Audio buffer is empty after decoding' });
+    }
 
     // Call Deepgram Prerecorded API with language detection
     const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
@@ -44,13 +55,19 @@ export default async function handler(
 
     if (error) {
       console.error('Deepgram API error:', error);
-      return res.status(500).json({ error: 'Language detection failed' });
+      return res.status(500).json({ error: 'Language detection failed', details: error });
+    }
+
+    // Validate response structure
+    if (!result?.results?.channels?.[0]) {
+      console.error('Invalid Deepgram response structure:', result);
+      return res.status(500).json({ error: 'Invalid response from Deepgram' });
     }
 
     // Extract detected language from response
     const channel = result.results.channels[0] as any; // Type assertion for language detection fields
     const detectedLanguage = channel.detected_language;
-    const confidence = channel.alternatives[0].confidence;
+    const confidence = channel.alternatives?.[0]?.confidence || 0;
     const alternatives = channel.language_alternatives || [];
 
     // Map Deepgram language codes to Gemini Live BCP-47 codes
