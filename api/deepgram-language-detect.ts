@@ -43,9 +43,10 @@ export default async function handler(
     }
 
     // Call Deepgram Prerecorded API with language detection
-    const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
+    const response = await deepgram.transcription.preRecorded(
       audioBuffer,
       {
+        mimetype: 'audio/webm;codecs=opus',
         model: 'nova-2',
         detect_language: true,
         punctuate: true,
@@ -53,19 +54,14 @@ export default async function handler(
       }
     );
 
-    if (error) {
-      console.error('Deepgram API error:', error);
-      return res.status(500).json({ error: 'Language detection failed', details: error });
-    }
-
     // Validate response structure
-    if (!result?.results?.channels?.[0]) {
-      console.error('Invalid Deepgram response structure:', result);
-      return res.status(500).json({ error: 'Invalid response from Deepgram' });
+    if (!response?.results?.channels?.[0]) {
+      console.error('Invalid Deepgram response structure:', response);
+      return res.status(500).json({ error: 'Invalid response from Deepgram', response });
     }
 
     // Extract detected language from response
-    const channel = result.results.channels[0] as any; // Type assertion for language detection fields
+    const channel = response.results.channels[0] as any; // Type assertion for language detection fields
     const detectedLanguage = channel.detected_language;
     const confidence = channel.alternatives?.[0]?.confidence || 0;
     const alternatives = channel.language_alternatives || [];
@@ -102,7 +98,7 @@ export default async function handler(
         confidence: alt.confidence,
         geminiLanguageCode: languageMapping[alt.language] || 'en-US',
       })),
-      transcript: result.results.channels[0].alternatives[0].transcript,
+      transcript: response.results.channels[0].alternatives[0].transcript,
     });
 
   } catch (error: any) {
