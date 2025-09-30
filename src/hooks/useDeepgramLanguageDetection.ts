@@ -52,7 +52,13 @@ export function useDeepgramLanguageDetection(): UseDeepgramLanguageDetectionRetu
       });
 
       if (!response.ok) {
-        throw new Error('Language detection API failed');
+        const errorData = await response.json();
+        console.error('===== DEEPGRAM API ERROR RESPONSE =====');
+        console.error('Status:', response.status);
+        console.error('Error Data:', errorData);
+        console.error('Debug Info:', errorData.debug);
+        console.error('======================================');
+        throw new Error(`Language detection API failed: ${JSON.stringify(errorData)}`);
       }
 
       const result: LanguageDetectionResult = await response.json();
