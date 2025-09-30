@@ -48,9 +48,10 @@ export default async function handler(
     }
 
     // Extract detected language from response
-    const detectedLanguage = result.results.channels[0].detected_language;
-    const confidence = result.results.channels[0].alternatives[0].confidence;
-    const alternatives = result.results.channels[0].language_alternatives || [];
+    const channel = result.results.channels[0] as any; // Type assertion for language detection fields
+    const detectedLanguage = channel.detected_language;
+    const confidence = channel.alternatives[0].confidence;
+    const alternatives = channel.language_alternatives || [];
 
     // Map Deepgram language codes to Gemini Live BCP-47 codes
     const languageMapping: Record<string, string> = {
