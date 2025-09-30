@@ -19,6 +19,8 @@ type LiveConfig = {
   inputLang?: string; // default 'nl-NL'
   // Optional: custom system prompt
   systemPrompt?: string;
+  // NEW: Dynamic language code from Deepgram detection
+  dynamicLanguageCode?: string; // BCP-47 code from language detection
 };
 
 export const useGeminiLive = (config: LiveConfig = {}) => {
@@ -39,7 +41,8 @@ export const useGeminiLive = (config: LiveConfig = {}) => {
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const audioOutput = config.audioOutput !== false; // default true
-  const inputLang = config.inputLang || 'nl-NL';
+  // Use dynamicLanguageCode if provided, otherwise fall back to inputLang
+  const inputLang = config.dynamicLanguageCode || config.inputLang || 'nl-NL';
   const MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 
   const initAudioContext = useCallback(async () => {

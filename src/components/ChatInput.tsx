@@ -5,6 +5,7 @@ import { SendIcon } from './icons/SendIcon';
 import { AttachmentIcon } from './icons/AttachmentIcon';
 import { XCircleIcon } from './icons/FileIcons';
 import { MicrophoneIcon } from './icons/MicrophoneIcon';
+import { useDeepgramLanguageDetection } from '../hooks/useDeepgramLanguageDetection';
 
 interface ChatInputProps {
   onSendMessage: (text: string, attachments: Attachment[]) => void;
@@ -16,7 +17,7 @@ interface ChatInputProps {
   isSttSupported: boolean;
   // Gemini Live props
   isGeminiLiveMode?: boolean;
-  startGeminiLive?: () => void;
+  startGeminiLive?: (detectedLanguage?: string) => void; // Updated to accept language
   stopGeminiLive?: () => void;
   isGeminiLiveListening?: boolean;
   isGeminiLiveSupported?: boolean;
@@ -50,8 +51,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [showLanguageDetection, setShowLanguageDetection] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Language detection hook
+  const {
+    detectLanguage,
+    isDetecting,
+    detectedLanguage,
+    error: detectionError,
+    reset: resetDetection,
+  } = useDeepgramLanguageDetection();
 
   useEffect(() => {
     setText(transcript);
@@ -109,16 +120,39 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleMicClick = () => {
+  const handleMicClick = async () => {
       if (isGeminiLiveMode) {
-          // Gemini Live mode
+          // Gemini Live mode with language detection
           if (isGeminiLiveListening) {
+              // Stop listening
               stopGeminiLive?.();
+              setShowLanguageDetection(false);
+              resetDetection();
           } else {
-              startGeminiLive?.();
+              try {
+                  // Step 1: Detect language first
+                  setShowLanguageDetection(true);
+                  const languageResult = await detectLanguage();
+                  
+                  console.log('Detected language:', languageResult);
+                  
+                  // Step 2: Start Gemini Live with detected language
+                  startGeminiLive?.(languageResult.geminiLanguageCode);
+                  
+                  // Show language detection UI for 2 seconds
+                  setTimeout(() => {
+                      setShowLanguageDetection(false);
+                  }, 2000);
+                  
+              } catch (error) {
+                  console.error('Language detection failed:', error);
+                  // Fallback to default language
+                  startGeminiLive?.();
+                  setShowLanguageDetection(false);
+              }
           }
       } else {
-          // Traditional Web Speech API mode
+          // Traditional Web Speech API mode (unchanged)
           if (isListening) {
               stopListening();
           } else {
@@ -245,6 +279,36 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </button>
           </div>
         </div>
+        
+        {/* Language Detection Display */}
+        {showLanguageDetection && detectedLanguage && (
+          <div className="absolute bottom-full mb-2 left-0 bg-gray-800 rounded-lg p-3 shadow-lg border border-green-500/30 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">
+                {detectedLanguage.language === 'nl' ? '🇳🇱' : 
+                 detectedLanguage.language === 'en' ? '🇬🇧' :
+                 detectedLanguage.language === 'de' ? '🇩🇪' :
+                 detectedLanguage.language === 'fr' ? '🇫🇷' : 
+                 detectedLanguage.language === 'es' ? '🇪🇸' :
+                 detectedLanguage.language === 'it' ? '🇮🇹' : '🌐'}
+              </span>
+              <div>
+                <p className="text-white font-medium">
+                  {detectedLanguage.language.toUpperCase()} detected
+                </p>
+                <p className="text-gray-400 text-sm">
+                  {Math.round(detectedLanguage.confidence * 100)}% confidence
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isDetecting && (
+          <div className="absolute bottom-full mb-2 left-0 bg-gray-800 rounded-lg p-3 shadow-lg">
+            <p className="text-white text-sm">🎤 Detecting language...</p>
+          </div>
+        )}
       </div>
     </div>
   );
