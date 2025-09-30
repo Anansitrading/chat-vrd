@@ -44,10 +44,13 @@ export default async function handler(
 
     // Call Deepgram Prerecorded API with language detection (v4.x format)
     // Per official docs: https://developers.deepgram.com/docs/node-sdk-pre-recorded-transcription
+    // Audio is PCM Int16, mono, 16kHz from frontend AudioCaptureManager
     const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
-      audioBuffer,  // First arg: audio buffer
+      audioBuffer,  // First arg: audio buffer (PCM Int16)
       {            // Second arg: options
-        mimetype: 'audio/webm;codecs=opus',
+        encoding: 'linear16',  // PCM Int16 encoding
+        sample_rate: 16000,    // 16kHz sample rate
+        channels: 1,           // Mono audio
         model: 'nova-2',
         detect_language: true,
         punctuate: true,
