@@ -110,46 +110,39 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       const newChat = startKijkoChat(settings.selectedModel, settings.systemPrompt);
       setChat(newChat);
 
-      // If no current chat ID, create a new session
-      if (!currentChatId && supabaseService.isAvailable()) {
-        try {
-          let user = await supabaseService.getCurrentUser();
-          if (!user) {
-            user = await supabaseService.signInAnonymously();
-          }
+      // If no current chat ID, create welcome message and optionally create session
+      if (!currentChatId) {
+        // Always show welcome message first
+        const welcomeMessage: UIMessage = {
+          id: Date.now().toString(),
+          role: 'model',
+          text: "Hello! I'm Kijko, your video brief assistant. I'll help you create a comprehensive production plan for your video project. To get started, could you tell me about your video idea? Feel free to share as much or as little as you have in mind, and we'll build from there.",
+          attachments: [],
+          isStreaming: false,
+          showOptions: false, // Don't show MCQ buttons on welcome message
+        };
+        setMessages([welcomeMessage]);
+        resetProgress(); // Reset progress for new chat
 
-          const newSessionId = await createNewChat();
-          if (newSessionId) {
-            setCurrentChatId(newSessionId);
-            resetProgress(); // Reset progress for new chat
-            
-            // Create welcome message and save it immediately
-            const welcomeMessage: UIMessage = {
-              id: Date.now().toString(),
-              role: 'model',
-              text: "Hello! I'm Kijko, your video brief assistant. I'll help you create a comprehensive production plan for your video project. To get started, could you tell me about your video idea? Feel free to share as much or as little as you have in mind, and we'll build from there.",
-              attachments: [],
-              isStreaming: false,
-              showOptions: false, // Don't show MCQ buttons on welcome message
-            };
-            
-            setMessages([welcomeMessage]);
-            // Save using the new session ID directly (fixes race condition)
-            await supabaseService.addMessage(newSessionId, welcomeMessage.text, 'assistant');
-            await loadChatSessions(); // Refresh the sidebar
+        // Try to create a session in Supabase if available
+        if (supabaseService.isAvailable()) {
+          try {
+            let user = await supabaseService.getCurrentUser();
+            if (!user) {
+              user = await supabaseService.signInAnonymously();
+            }
+
+            const newSessionId = await createNewChat();
+            if (newSessionId) {
+              setCurrentChatId(newSessionId);
+              // Save welcome message using the new session ID
+              await supabaseService.addMessage(newSessionId, welcomeMessage.text, 'assistant');
+              await loadChatSessions(); // Refresh the sidebar
+            }
+          } catch (error) {
+            console.error('Error creating chat session:', error);
+            // Continue with welcome message already displayed
           }
-        } catch (error) {
-          console.error('Error initializing chat session:', error);
-          // Fallback to showing welcome message without saving
-          const welcomeMessage: UIMessage = {
-            id: Date.now().toString(),
-            role: 'model',
-            text: "Hello! I'm Kijko, your video brief assistant. I'll help you create a comprehensive production plan for your video project. To get started, could you tell me about your video idea? Feel free to share as much or as little as you have in mind, and we'll build from there.",
-            attachments: [],
-            isStreaming: false,
-            showOptions: false, // Don't show MCQ buttons on welcome message
-          };
-          setMessages([welcomeMessage]);
         }
       }
     };
