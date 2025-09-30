@@ -42,17 +42,15 @@ export default async function handler(
       return res.status(400).json({ error: 'Audio buffer is empty after decoding' });
     }
 
-    // Call Deepgram Prerecorded API with language detection
-    const response = await deepgram.transcription.preRecorded(
-      audioBuffer,
-      {
-        mimetype: 'audio/webm;codecs=opus',
-        model: 'nova-2',
-        detect_language: true,
-        punctuate: true,
-        smart_format: true,
-      }
-    );
+    // Call Deepgram Prerecorded API with language detection (v3+ format)
+    const response = await deepgram.transcription.preRecorded({
+      buffer: audioBuffer,
+      mimetype: 'audio/webm;codecs=opus',
+      model: 'nova-2',
+      detect_language: true,
+      punctuate: true,
+      smart_format: true,
+    });
 
     // Validate response structure
     if (!response?.results?.channels?.[0]) {
