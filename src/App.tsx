@@ -17,10 +17,21 @@ import { useTextToSpeech } from './hooks/useTextToSpeech';
 import { useSpeechToText } from './hooks/useSpeechToText';
 import { MCQOption, stripMarkdownForTTS } from './utils/messageClassifier';
 import { KIJKO_SYSTEM_PROMPT } from './constants';
+import { VersionChecker } from './utils/versionChecker';
 
 const AppContent: React.FC = () => {
   const { isSpeaking, isTtsEnabled, setIsTtsEnabled, speak, stop: stopTts } = useTextToSpeech();
 
+  // Initialize version checking for automatic cache invalidation
+  useEffect(() => {
+    const versionChecker = new VersionChecker();
+    versionChecker.startMonitoring();
+    
+    // Cleanup on unmount
+    return () => {
+      versionChecker.stopMonitoring();
+    };
+  }, []);
 
   return (
     <div className="flex flex-col h-screen" style={{ background: 'var(--bg-main)' }}>
