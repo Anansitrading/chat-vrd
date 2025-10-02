@@ -220,6 +220,15 @@ export const useGeminiLive = (config: LiveConfig = {}) => {
   }, [stopListening]);
 
   useEffect(() => () => { disconnect(); }, [disconnect]);
+  
+  // Reconnect when inputLang changes (after language detection)
+  useEffect(() => {
+    if (state.isConnected && sessionRef.current) {
+      // Language changed after initial connection - need to reconnect
+      console.log('Language changed to:', inputLang, '- reconnecting...');
+      disconnect().then(() => connect());
+    }
+  }, [inputLang]); // Only trigger on language change
 
   return {
     ...state,
