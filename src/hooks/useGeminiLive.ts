@@ -43,7 +43,7 @@ export const useGeminiLive = (config: LiveConfig = {}) => {
   const audioOutput = config.audioOutput !== false; // default true
   // Use dynamicLanguageCode if provided, otherwise fall back to inputLang
   const inputLang = config.dynamicLanguageCode || config.inputLang || 'nl-NL';
-  const MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
+  const MODEL = 'gemini-2.0-flash-exp';
 
   const initAudioContext = useCallback(async () => {
     if (!audioCtxRef.current) {

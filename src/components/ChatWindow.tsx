@@ -41,7 +41,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const { isListening, transcript, startListening, stopListening, setTranscript, isSttSupported } = useSpeechToText('nl-NL');
 
   // Gemini Live integration
-  const isGeminiLiveMode = settings.selectedModel === 'gemini-live-2.5-flash-preview-native-audio-09-2025';
+  const isGeminiLiveMode = settings.selectedModel === 'gemini-2.0-flash-exp';
   const [liveAudioEnabled, setLiveAudioEnabled] = useState(true);
   
   const {
