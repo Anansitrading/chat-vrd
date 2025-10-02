@@ -152,11 +152,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     initializeChat();
   }, [settings.selectedModel, settings.systemPrompt]);
 
-  // Connect/disconnect Gemini Live when switching models
+  // Connect/disconnect Gemini Live when switching models OR when detected language changes
   useEffect(() => {
-    if (isGeminiLiveMode) {
-      connectLive();
-    } else if (isLiveConnected) {
+    if (isGeminiLiveMode && detectedLang) {
+      console.log('[ChatWindow] Detected language changed to:', detectedLang, '- connecting Gemini Live...');
+      // Disconnect if already connected, then reconnect with new language
+      if (isLiveConnected) {
+        disconnectLive();
+        // Small delay to ensure clean disconnect before reconnecting
+        setTimeout(() => connectLive(), 500);
+      } else {
+        connectLive();
+      }
+    } else if (!isGeminiLiveMode && isLiveConnected) {
       disconnectLive();
     }
     
@@ -165,7 +173,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         disconnectLive();
       }
     };
-  }, [isGeminiLiveMode, connectLive, disconnectLive, isLiveConnected]);
+  }, [isGeminiLiveMode, detectedLang]); // React to model change AND language change
 
   // Load messages when currentChatId changes
   useEffect(() => {

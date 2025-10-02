@@ -43,6 +43,7 @@ The content is organized as follows:
 .marscode/
   deviceInfo.json
 api/
+  deepgram-language-detect.ts
   generate-token.ts
   perplexity.js
 components/
@@ -56,7 +57,12 @@ components/
   ChatMessage.tsx
   Header.tsx
 docs/
+  deepgram/
+    00-OVERVIEW.md
+    01-BACKEND-API.md
+    02-AUDIO-CAPTURE.md
   DEEPGRAM_STT_SPECIFICATION.md
+  Enhanced Deepgram STT Specification for Language D.md
 hooks/
   useTextToSpeech.ts
 public/
@@ -94,6 +100,7 @@ src/
     ChatContext.tsx
     SettingsContext.tsx
   hooks/
+    useDeepgramLanguageDetection.ts
     useGeminiLive.ts
     useGeminiLive.ts.backup
     useProgress.ts
@@ -107,6 +114,7 @@ src/
     settings.ts
     speech.d.ts
   utils/
+    audioCapture.ts
     documentStorage.ts
     messageClassifier.ts
     settingsStorage.ts
@@ -142,448 +150,6 @@ WARP.md
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path="docs/DEEPGRAM_STT_SPECIFICATION.md">
-# Deepgram Language Detection - Implementation Specification
-
-## Project Context
-
-**App:** Kijko Video Brief Assistant  
-**Current State:** Uses browser Web Speech API for speech-to-text  
-**Goal:** Implement Deepgram for automatic language detection and reliable STT across all browsers  
-**Priority:** High - Web Speech API is unreliable on mobile browsers
-
----
-
-## 1. Requirements
-
-### 1.1 Functional Requirements
-
-**FR-1: Automatic Language Detection**
-- When user clicks microphone button, capture 1-2 seconds of audio
-- Send audio sample to Deepgram for language detection
-- Detect spoken language (Dutch, English, etc.) with confidence scores
-- Display detected language to user
-
-**FR-2: Speech-to-Text Transcription**
-- After language detection, continue streaming audio to Deepgram
-- Use detected language for accurate transcription
-- Display transcript in real-time as user speaks
-- Support continuous speech recognition
-
-**FR-3: Fallback Mechanism**
-- If Deepgram API fails, fall back to Web Speech API
-- Show clear error messages if both fail
-- Allow user to retry or type manually
-
-**FR-4: Browser Compatibility**
-- Must work on desktop Chrome, Firefox, Safari
-- Must work on mobile Chrome (Android)
-- Must work on mobile Safari (iOS) - currently unsupported by Web Speech API
-
-### 1.2 Non-Functional Requirements
-
-**NFR-1: Performance**
-- Language detection latency < 500ms
-- Real-time transcription with minimal lag
-- Efficient audio streaming (low bandwidth)
-
-**NFR-2: Security**
-- API keys stored securely in Vercel environment variables
-- Audio data encrypted in transit
-- No audio stored on server after transcription
-
-**NFR-3: Cost Efficiency**
-- Minimize Deepgram API usage
-- Only detect language once per session
-- Cache language preference for user
-
----
-
-## 2. Current Architecture
-
-### 2.1 Existing Components
-
-**File:** `src/hooks/useSpeechToText.ts`
-- Uses browser's `SpeechRecognition` API
-- Supports continuous listening
-- Language set to `nl-NL` (Dutch) by default
-- Returns: `{ isListening, transcript, startListening, stopListening, isSttSupported }`
-
-**File:** `src/components/ChatInput.tsx`
-- Renders microphone button (line 168-192)
-- `handleMicClick()` toggles listening on/off (line 112-128)
-- Displays transcript in textarea
-- Two modes: Web Speech API mode and Gemini Live mode
-
-**File:** `api/generate-token.ts`
-- Vercel serverless function
-- Creates ephemeral tokens for Gemini Live
-- Already has environment variable pattern: `GEMINI_API_KEY`
-
-### 2.2 Environment Variables (Already Set)
-
-- `DEEPGRAM_API_KEY` ✅ Already configured in Vercel
-- `GEMINI_API_KEY` ✅ Already configured in Vercel
-- `VITE_SUPABASE_URL` ✅ Already configured
-- `VITE_SUPABASE_ANON_KEY` ✅ Already configured
-
----
-
-## 3. Implementation Design
-
-### 3.1 New Files to Create
-
-**1. `api/deepgram-language-detect.ts`**
-```typescript
-// Vercel serverless function
-// Accepts: base64 PCM audio sample (1-2 seconds)
-// Returns: { language: 'nl', confidence: 0.95 }
-```
-
-**2. `api/deepgram-transcribe.ts`**
-```typescript
-// Vercel serverless function
-// Accepts: streaming audio chunks
-// Returns: real-time transcription stream
-```
-
-**3. `src/hooks/useDeepgramSTT.ts`**
-```typescript
-// React hook for Deepgram integration
-// Handles: language detection, audio capture, streaming, transcription
-// Returns: same interface as useSpeechToText for easy replacement
-```
-
-**4. `src/utils/audioCapture.ts`**
-```typescript
-// Utility functions for:
-// - Capturing microphone audio
-// - Converting to PCM Int16 format
-// - Base64 encoding
-// - Streaming audio chunks
-```
-
-### 3.2 Modified Files
-
-**1. `src/components/ChatInput.tsx`**
-```typescript
-// Add toggle: Web Speech API vs Deepgram
-// Add language detection UI (show detected language)
-// Update handleMicClick() to use Deepgram when enabled
-```
-
-**2. `src/contexts/SettingsContext.tsx`** (if exists, else create)
-```typescript
-// Add setting: preferDeepgram (boolean)
-// Store detected language preference
-// Allow user to choose STT provider
-```
-
----
-
-## 4. Implementation Flow
-
-### 4.1 User Clicks Microphone Button
-
-```
-1. User clicks mic button in ChatInput
-2. Request microphone permission
-3. Capture 1-2 seconds of audio sample
-4. Convert audio to PCM Int16, 16kHz, mono
-5. Base64 encode audio
-6. Send to /api/deepgram-language-detect
-7. Display detected language (e.g., "🇳🇱 Dutch detected")
-8. Start continuous streaming to /api/deepgram-transcribe
-9. Display real-time transcript
-10. On stop, finalize transcript and populate textarea
-```
-
-### 4.2 API Flow
-
-**Deepgram Language Detection:**
-```
-POST /api/deepgram-language-detect
-Body: { audioBase64: "..." }
-
-→ Deepgram Prerecorded API
-→ Language detection model
-
-Response: {
-  language: "nl",
-  confidence: 0.95,
-  alternatives: [
-    { language: "en", confidence: 0.03 },
-    { language: "de", confidence: 0.02 }
-  ]
-}
-```
-
-**Deepgram Streaming Transcription:**
-```
-WebSocket /api/deepgram-transcribe
-Body: { language: "nl", audioChunks: [...] }
-
-→ Deepgram Live Streaming API
-→ Real-time transcription
-
-Response (streaming): {
-  transcript: "Hallo, ik ben...",
-  isFinal: false
-}
-```
-
----
-
-## 5. Deepgram API Integration
-
-### 5.1 Language Detection Endpoint
-
-**Deepgram API:** Prerecorded Audio API  
-**Endpoint:** `https://api.deepgram.com/v1/listen`  
-**Parameters:**
-- `model=nova-2`
-- `detect_language=true`
-- `punctuate=true`
-- `smart_format=true`
-
-**Audio Format:**
-- PCM Int16, 16kHz, mono
-- 1-2 seconds duration
-- ~32KB per second
-
-### 5.2 Streaming Transcription Endpoint
-
-**Deepgram API:** Live Streaming API  
-**Endpoint:** `wss://api.deepgram.com/v1/listen`  
-**Parameters:**
-- `model=nova-2`
-- `language=nl` (use detected language)
-- `punctuate=true`
-- `interim_results=true`
-- `endpointing=500` (ms of silence before finalizing)
-
----
-
-## 6. UI/UX Considerations
-
-### 6.1 Language Detection Display
-
-```
-[Mic Button] 🎤 Listening...
-└─ 🇳🇱 Dutch detected (95% confidence)
-```
-
-### 6.2 Settings Toggle
-
-```
-⚙️ Speech-to-Text Settings
-┌─────────────────────────────┐
-│ ☐ Use Deepgram (recommended)│
-│ ☑ Use Browser Speech API    │
-│                              │
-│ Last detected: Dutch (nl-NL) │
-└─────────────────────────────┘
-```
-
-### 6.3 Error States
-
-- "Microphone access denied"
-- "Deepgram API unavailable (using fallback)"
-- "Language detection failed (defaulting to Dutch)"
-- "Transcription service unavailable"
-
----
-
-## 7. Testing Requirements
-
-### 7.1 Unit Tests
-
-- Audio capture and format conversion
-- Base64 encoding/decoding
-- API endpoint error handling
-- Fallback mechanism
-
-### 7.2 Integration Tests
-
-- Language detection with Dutch audio sample
-- Language detection with English audio sample
-- Streaming transcription accuracy
-- Fallback to Web Speech API when Deepgram fails
-
-### 7.3 Browser Compatibility Tests
-
-| Browser | Platform | STT Support | Expected Result |
-|---------|----------|-------------|-----------------|
-| Chrome | Desktop | ✅ | Deepgram + Web Speech fallback |
-| Firefox | Desktop | ✅ | Deepgram + Web Speech fallback |
-| Safari | Desktop | ✅ | Deepgram + Web Speech fallback |
-| Chrome | Android | ⚠️ Partial | Deepgram (primary), Web Speech (unreliable) |
-| Safari | iOS | ❌ None | Deepgram only (Web Speech unsupported) |
-
----
-
-## 8. Cost Estimation
-
-### 8.1 Deepgram Pricing
-
-**Pay-as-you-go:**
-- $0.0043 per minute of audio (Nova-2 model)
-- Language detection: ~$0.0001 per request (1-2 seconds)
-- Free tier: $200 credit
-
-**Monthly Estimate (100 users, 10 mins/user/month):**
-- 100 users × 10 minutes × $0.0043 = **$4.30/month**
-- Language detection: 100 users × 10 sessions × $0.0001 = **$0.10/month**
-- **Total: ~$4.40/month**
-
-### 8.2 Cost Optimization
-
-- Cache detected language per user session
-- Only detect language once per conversation
-- Use interim results to reduce final transcription calls
-- Consider batch processing for non-real-time use cases
-
----
-
-## 9. Implementation Phases
-
-### Phase 1: Backend API (Week 1)
-- [ ] Create `/api/deepgram-language-detect.ts`
-- [ ] Create `/api/deepgram-transcribe.ts`
-- [ ] Test with Postman/curl
-- [ ] Add error handling and logging
-
-### Phase 2: Frontend Hook (Week 1)
-- [ ] Create `src/hooks/useDeepgramSTT.ts`
-- [ ] Create `src/utils/audioCapture.ts`
-- [ ] Match interface with `useSpeechToText`
-- [ ] Add language detection state
-
-### Phase 3: UI Integration (Week 2)
-- [ ] Update `ChatInput.tsx` with Deepgram option
-- [ ] Add language detection display
-- [ ] Add settings toggle
-- [ ] Add error states and fallback
-
-### Phase 4: Testing & Refinement (Week 2)
-- [ ] Test on all browsers
-- [ ] Test mobile devices (real devices, not emulator!)
-- [ ] Optimize audio streaming
-- [ ] Add telemetry/monitoring
-
----
-
-## 10. Success Criteria
-
-✅ **Must Have:**
-1. Language detection works with <500ms latency
-2. Transcription accuracy ≥90% for Dutch and English
-3. Works on iOS Safari (currently unsupported)
-4. Graceful fallback to Web Speech API
-5. No increase in perceived latency vs current implementation
-
-✅ **Nice to Have:**
-1. Support for additional languages (German, French, Spanish)
-2. Confidence scores displayed to user
-3. User can override detected language
-4. Audio quality indicator (volume meter)
-5. Offline mode with service worker caching
-
----
-
-## 11. Dependencies
-
-**NPM Packages:**
-- `@deepgram/sdk` (official Deepgram Node SDK)
-- Already installed: `@vercel/node`, `@google/genai`
-
-**APIs:**
-- Deepgram API v1
-- Browser MediaStream API
-- Web Audio API
-
-**Infrastructure:**
-- Vercel Serverless Functions
-- Environment variables already configured
-
----
-
-## 12. Rollout Strategy
-
-### 12.1 Feature Flag
-
-```typescript
-// src/config/features.ts
-export const FEATURES = {
-  DEEPGRAM_STT: process.env.VITE_ENABLE_DEEPGRAM === 'true',
-  WEB_SPEECH_FALLBACK: true,
-};
-```
-
-### 12.2 Gradual Rollout
-
-1. **Week 1:** Deploy to staging only
-2. **Week 2:** Enable for 10% of users (A/B test)
-3. **Week 3:** Enable for 50% of users
-4. **Week 4:** Enable for 100% of users
-5. Monitor error rates, transcription accuracy, costs
-
----
-
-## 13. Monitoring & Observability
-
-### 13.1 Metrics to Track
-
-- Language detection success rate
-- Language detection latency (P50, P95, P99)
-- Transcription accuracy (via user feedback)
-- Fallback rate (Deepgram → Web Speech)
-- API error rate
-- Monthly Deepgram costs
-
-### 13.2 Logging
-
-- Log all language detection requests
-- Log transcription failures
-- Log fallback triggers
-- Log user feedback on accuracy
-
----
-
-## 14. Documentation
-
-- [ ] User guide: How to use voice input
-- [ ] Developer guide: Deepgram integration architecture
-- [ ] API documentation: Endpoint specs
-- [ ] Troubleshooting guide: Common issues
-- [ ] FAQ: Language support, accuracy, costs
-
----
-
-## 15. Open Questions
-
-1. Should we cache detected language in localStorage?
-2. Should we allow user to manually select language?
-3. What happens if user switches languages mid-conversation?
-4. Should we support offline mode with Web Speech API fallback?
-5. How do we handle multi-lingual input (code-switching)?
-
----
-
-**Next Steps:**
-1. Review this specification with stakeholders
-2. Get approval on architecture and approach
-3. Set up Deepgram account and test API
-4. Create development branch
-5. Implement Phase 1 (Backend APIs)
-
----
-
-**Created:** January 30, 2025  
-**Author:** AI Assistant  
-**Status:** Draft - Pending Review
-</file>
 
 <file path=".marscode/deviceInfo.json">
 {
@@ -922,6 +488,919 @@ export const ChatMessage: React.FC<{ message: UIMessage }> = ({ message }) => {
     </div>
   );
 };
+</file>
+
+<file path="docs/deepgram/00-OVERVIEW.md">
+# Enhanced Deepgram STT Specification for Language Detection with Gemini Live Integration
+
+Based on the codebase analysis and research, here's the comprehensive specification with implementation details for integrating Deepgram language detection with Gemini Live API language configuration.
+
+## Critical Implementation Gap Identified
+
+The original specification missed a **crucial integration point**: Deepgram language detection must dynamically set the `languageCode` in Gemini Live's `speechConfig` to ensure proper bidirectional speech recognition.[1][2][3][4]
+
+## Enhanced Architecture Overview
+
+The implementation requires a two-stage approach:
+1. **Stage 1**: Deepgram detects language from initial audio sample (1-2 seconds)
+2. **Stage 2**: Pass detected language to Gemini Live session configuration for proper STT
+
+## Document Structure
+
+This specification is split into multiple focused documents:
+
+- **00-OVERVIEW.md** (this file) - Architecture and implementation gap
+- **01-BACKEND-API.md** - Vercel serverless function for language detection
+- **02-AUDIO-CAPTURE.md** - Browser audio capture and PCM conversion
+- **03-REACT-HOOKS.md** - Language detection React hook
+- **04-GEMINI-INTEGRATION.md** - Gemini Live dynamic language configuration
+- **05-CHATINPUT-INTEGRATION.md** - UI integration and user flow
+- **06-MOBILE-CONSIDERATIONS.md** - iOS/Android specific optimizations
+- **07-TESTING-DEPLOYMENT.md** - Testing strategy and deployment guide
+
+## Key Improvements Over Original Spec
+
+1. **Language Mapping**: Added Deepgram→Gemini BCP-47 code mapping[4]
+2. **Mobile Audio Processing**: PCM conversion works on iOS/Android[5]
+3. **Dynamic Language Injection**: Gemini Live config accepts detected language[4]
+4. **Error Handling**: Graceful fallback to default language
+5. **UI Feedback**: Real-time language detection display
+6. **VAD Configuration**: Optimized for natural conversation flow[4]
+7. **Input Audio Transcription**: Enabled in Gemini Live for accurate STT[4]
+
+## Cost Optimization
+
+- Language detection: ~$0.0001 per 2-second sample[1]
+- Cache detected language in session storage
+- Only detect once per conversation session
+- Estimated: **$0.10/month for 100 users**[1]
+
+This implementation ensures Deepgram detects the language, then Gemini Live uses that language code for accurate bidirectional speech-to-text on mobile devices.[3][2][1][4]
+
+## References
+
+[1] DEEPGRAM_STT_SPECIFICATION.md
+[2] repomix-output.xml
+[3] https://deepgram.com/learn/introducing-automatic-language-detection-capabilities
+[4] https://ai.google.dev/gemini-api/docs/live-guide
+[5] https://deepgram.com/learn/live-transcription-mic-browser
+</file>
+
+<file path="docs/deepgram/01-BACKEND-API.md">
+# Backend API Implementation
+
+## Complete Implementation Guide
+
+### 1. Backend API Implementation
+
+#### **File: `api/deepgram-language-detect.ts`**
+
+This Vercel serverless function performs initial language detection:
+
+```typescript
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient } from '@deepgram/sdk';
+
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
+  // Enable CORS for Vercel deployment
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { audioBase64 } = req.body;
+
+    if (!audioBase64) {
+      return res.status(400).json({ error: 'Audio data required' });
+    }
+
+    // Initialize Deepgram client with Vercel environment variable
+    const deepgram = createClient(process.env.DEEPGRAM_API_KEY!);
+
+    // Convert base64 to buffer
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+
+    // Call Deepgram Prerecorded API with language detection
+    const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
+      audioBuffer,
+      {
+        model: 'nova-2',
+        detect_language: true,
+        punctuate: true,
+        smart_format: true,
+      }
+    );
+
+    if (error) {
+      console.error('Deepgram API error:', error);
+      return res.status(500).json({ error: 'Language detection failed' });
+    }
+
+    // Extract detected language from response
+    const detectedLanguage = result.results.channels[0].detected_language;
+    const confidence = result.results.channels[0].alternatives[0].confidence;
+    const alternatives = result.results.channels[0].language_alternatives || [];
+
+    // Map Deepgram language codes to Gemini Live BCP-47 codes
+    const languageMapping: Record<string, string> = {
+      'nl': 'nl-NL',
+      'en': 'en-US',
+      'de': 'de-DE',
+      'fr': 'fr-FR',
+      'es': 'es-ES',
+      'it': 'it-IT',
+      'pt': 'pt-BR',
+      'ja': 'ja-JP',
+      'ko': 'ko-KR',
+      'hi': 'hi-IN',
+      'ar': 'ar-XA',
+      'tr': 'tr-TR',
+      'vi': 'vi-VN',
+      'id': 'id-ID',
+      'pl': 'pl-PL',
+      'ru': 'ru-RU',
+      'th': 'th-TH',
+    };
+
+    const geminiLanguageCode = languageMapping[detectedLanguage] || 'en-US';
+
+    return res.status(200).json({
+      language: detectedLanguage,
+      geminiLanguageCode,
+      confidence,
+      alternatives: alternatives.map((alt: any) => ({
+        language: alt.language,
+        confidence: alt.confidence,
+        geminiLanguageCode: languageMapping[alt.language] || 'en-US',
+      })),
+      transcript: result.results.channels[0].alternatives[0].transcript,
+    });
+
+  } catch (error) {
+    console.error('Server error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+```
+
+**Key Enhancement**: Added language mapping from Deepgram codes to Gemini Live BCP-47 codes.[4][1]
+
+## Environment Variables Setup
+
+Add to Vercel dashboard (already configured according to spec):
+
+```bash
+DEEPGRAM_API_KEY=your_deepgram_key_here
+GEMINI_API_KEY=your_gemini_key_here
+```
+
+Access in Vercel functions via `process.env.DEEPGRAM_API_KEY`.[1][2]
+</file>
+
+<file path="docs/deepgram/02-AUDIO-CAPTURE.md">
+# Audio Capture Utility Implementation
+
+### 2. Audio Capture Utility
+
+#### **File: `src/utils/audioCapture.ts`**
+
+Handles microphone access and audio processing. This file contains the complete AudioCaptureManager class with all methods for:
+- Microphone initialization
+- 2-second audio sample capture
+- PCM Int16 conversion (WebM/Opus → PCM)
+- Base64 encoding
+- Audio streaming for continuous transcription
+- Resource cleanup
+
+**Mobile Optimization**: Includes echo cancellation and noise suppression for mobile devices.[5][1]
+
+**See your provided specification for the complete 200+ line implementation.**
+
+Key methods:
+- `initialize()` - Request mic permission and create AudioContext
+- `captureInitialSample(durationMs)` - Capture audio for language detection
+- `convertToPCM(audioBlob)` - Convert to PCM Int16 format
+- `arrayBufferToBase64(buffer)` - Encode for API transmission
+- `startStreaming(onAudioChunk)` - Continuous audio streaming
+- `cleanup()` - Release all resources
+</file>
+
+<file path="docs/Enhanced Deepgram STT Specification for Language D.md">
+<img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
+
+# Enhanced Deepgram STT Specification for Language Detection with Gemini Live Integration
+
+Based on the codebase analysis and research, here's the comprehensive specification with implementation details for integrating Deepgram language detection with Gemini Live API language configuration.
+
+## Critical Implementation Gap Identified
+
+The original specification missed a **crucial integration point**: Deepgram language detection must dynamically set the `languageCode` in Gemini Live's `speechConfig` to ensure proper bidirectional speech recognition.[^1][^2][^3][^4]
+
+## Enhanced Architecture Overview
+
+The implementation requires a two-stage approach:
+
+1. **Stage 1**: Deepgram detects language from initial audio sample (1-2 seconds)
+2. **Stage 2**: Pass detected language to Gemini Live session configuration for proper STT
+
+## Complete Implementation Guide
+
+### 1. Backend API Implementation
+
+#### **File: `api/deepgram-language-detect.ts`**
+
+This Vercel serverless function performs initial language detection:
+
+```typescript
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient } from '@deepgram/sdk';
+
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
+  // Enable CORS for Vercel deployment
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { audioBase64 } = req.body;
+
+    if (!audioBase64) {
+      return res.status(400).json({ error: 'Audio data required' });
+    }
+
+    // Initialize Deepgram client with Vercel environment variable
+    const deepgram = createClient(process.env.DEEPGRAM_API_KEY!);
+
+    // Convert base64 to buffer
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+
+    // Call Deepgram Prerecorded API with language detection
+    const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
+      audioBuffer,
+      {
+        model: 'nova-2',
+        detect_language: true,
+        punctuate: true,
+        smart_format: true,
+      }
+    );
+
+    if (error) {
+      console.error('Deepgram API error:', error);
+      return res.status(500).json({ error: 'Language detection failed' });
+    }
+
+    // Extract detected language from response
+    const detectedLanguage = result.results.channels[^0].detected_language;
+    const confidence = result.results.channels[^0].alternatives[^0].confidence;
+    const alternatives = result.results.channels[^0].language_alternatives || [];
+
+    // Map Deepgram language codes to Gemini Live BCP-47 codes
+    const languageMapping: Record<string, string> = {
+      'nl': 'nl-NL',
+      'en': 'en-US',
+      'de': 'de-DE',
+      'fr': 'fr-FR',
+      'es': 'es-ES',
+      'it': 'it-IT',
+      'pt': 'pt-BR',
+      'ja': 'ja-JP',
+      'ko': 'ko-KR',
+      'hi': 'hi-IN',
+      'ar': 'ar-XA',
+      'tr': 'tr-TR',
+      'vi': 'vi-VN',
+      'id': 'id-ID',
+      'pl': 'pl-PL',
+      'ru': 'ru-RU',
+      'th': 'th-TH',
+    };
+
+    const geminiLanguageCode = languageMapping[detectedLanguage] || 'en-US';
+
+    return res.status(200).json({
+      language: detectedLanguage,
+      geminiLanguageCode,
+      confidence,
+      alternatives: alternatives.map((alt: any) => ({
+        language: alt.language,
+        confidence: alt.confidence,
+        geminiLanguageCode: languageMapping[alt.language] || 'en-US',
+      })),
+      transcript: result.results.channels[^0].alternatives[^0].transcript,
+    });
+
+  } catch (error) {
+    console.error('Server error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+```
+
+**Key Enhancement**: Added language mapping from Deepgram codes to Gemini Live BCP-47 codes.[^4][^1]
+
+### 2. Audio Capture Utility
+
+#### **File: `src/utils/audioCapture.ts`**
+
+Handles microphone access and audio processing:
+
+```typescript
+export interface AudioCaptureResult {
+  base64Audio: string;
+  mimeType: string;
+  duration: number;
+}
+
+export class AudioCaptureManager {
+  private mediaStream: MediaStream | null = null;
+  private audioContext: AudioContext | null = null;
+  private mediaRecorder: MediaRecorder | null = null;
+  private audioChunks: Blob[] = [];
+
+  /**
+   * Request microphone permission and initialize audio context
+   */
+  async initialize(): Promise<void> {
+    try {
+      // Request microphone with optimal settings for speech
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1, // Mono
+          sampleRate: 16000, // 16kHz for Deepgram
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      // Create audio context for processing
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+        sampleRate: 16000,
+      });
+
+    } catch (error) {
+      console.error('Microphone access denied:', error);
+      throw new Error('Microphone permission required');
+    }
+  }
+
+  /**
+   * Capture initial audio sample for language detection
+   * @param durationMs Duration in milliseconds (default: 2000ms)
+   */
+  async captureInitialSample(durationMs: number = 2000): Promise<AudioCaptureResult> {
+    if (!this.mediaStream) {
+      throw new Error('Audio capture not initialized');
+    }
+
+    return new Promise((resolve, reject) => {
+      this.audioChunks = [];
+
+      // Use MediaRecorder for browser compatibility
+      const options: MediaRecorderOptions = {
+        mimeType: 'audio/webm;codecs=opus', // Wide browser support
+      };
+
+      this.mediaRecorder = new MediaRecorder(this.mediaStream!, options);
+
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          this.audioChunks.push(event.data);
+        }
+      };
+
+      this.mediaRecorder.onstop = async () => {
+        try {
+          const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+          
+          // Convert to PCM Int16 for Deepgram
+          const pcmData = await this.convertToPCM(audioBlob);
+          const base64Audio = this.arrayBufferToBase64(pcmData);
+
+          resolve({
+            base64Audio,
+            mimeType: 'audio/pcm;rate=16000',
+            duration: durationMs,
+          });
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      this.mediaRecorder.start();
+
+      // Stop after specified duration
+      setTimeout(() => {
+        this.mediaRecorder?.stop();
+      }, durationMs);
+    });
+  }
+
+  /**
+   * Convert WebM/Opus audio to PCM Int16 format for Deepgram
+   */
+  private async convertToPCM(audioBlob: Blob): Promise<ArrayBuffer> {
+    if (!this.audioContext) {
+      throw new Error('Audio context not initialized');
+    }
+
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+    // Get audio data (mono channel)
+    const channelData = audioBuffer.getChannelData(0);
+
+    // Convert Float32 to Int16 PCM
+    const pcmData = new Int16Array(channelData.length);
+    for (let i = 0; i < channelData.length; i++) {
+      // Clamp to [-1, 1] and convert to 16-bit integer
+      const sample = Math.max(-1, Math.min(1, channelData[i]));
+      pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+    }
+
+    return pcmData.buffer;
+  }
+
+  /**
+   * Convert ArrayBuffer to base64 string
+   */
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  /**
+   * Start streaming audio for continuous transcription
+   */
+  startStreaming(onAudioChunk: (chunk: ArrayBuffer) => void): void {
+    if (!this.mediaStream || !this.audioContext) {
+      throw new Error('Audio capture not initialized');
+    }
+
+    const source = this.audioContext.createMediaStreamSource(this.mediaStream);
+    const processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+
+    processor.onaudioprocess = (event) => {
+      const inputData = event.inputBuffer.getChannelData(0);
+      const pcmData = new Int16Array(inputData.length);
+      
+      for (let i = 0; i < inputData.length; i++) {
+        const sample = Math.max(-1, Math.min(1, inputData[i]));
+        pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+      }
+
+      onAudioChunk(pcmData.buffer);
+    };
+
+    source.connect(processor);
+    processor.connect(this.audioContext.destination);
+  }
+
+  /**
+   * Clean up resources
+   */
+  cleanup(): void {
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      this.mediaRecorder.stop();
+    }
+
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach(track => track.stop());
+      this.mediaStream = null;
+    }
+
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+  }
+}
+```
+
+**Mobile Optimization**: Includes echo cancellation and noise suppression for mobile devices.[^5][^1]
+
+### 3. React Hook Integration
+
+#### **File: `src/hooks/useDeepgramLanguageDetection.ts`**
+
+Custom hook for seamless integration:
+
+```typescript
+import { useState, useCallback, useRef } from 'react';
+import { AudioCaptureManager } from '../utils/audioCapture';
+
+export interface LanguageDetectionResult {
+  language: string;
+  geminiLanguageCode: string;
+  confidence: number;
+  alternatives?: Array<{
+    language: string;
+    confidence: number;
+    geminiLanguageCode: string;
+  }>;
+}
+
+export interface UseDeepgramLanguageDetectionReturn {
+  detectLanguage: () => Promise<LanguageDetectionResult>;
+  isDetecting: boolean;
+  detectedLanguage: LanguageDetectionResult | null;
+  error: string | null;
+  reset: () => void;
+}
+
+export function useDeepgramLanguageDetection(): UseDeepgramLanguageDetectionReturn {
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [detectedLanguage, setDetectedLanguage] = useState<LanguageDetectionResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const audioCaptureRef = useRef<AudioCaptureManager | null>(null);
+
+  const detectLanguage = useCallback(async (): Promise<LanguageDetectionResult> => {
+    setIsDetecting(true);
+    setError(null);
+
+    try {
+      // Initialize audio capture
+      if (!audioCaptureRef.current) {
+        audioCaptureRef.current = new AudioCaptureManager();
+      }
+      await audioCaptureRef.current.initialize();
+
+      // Capture 2-second audio sample
+      const audioSample = await audioCaptureRef.current.captureInitialSample(2000);
+
+      // Send to Vercel serverless function
+      const response = await fetch('/api/deepgram-language-detect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          audioBase64: audioSample.base64Audio,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Language detection API failed');
+      }
+
+      const result: LanguageDetectionResult = await response.json();
+      setDetectedLanguage(result);
+      
+      return result;
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Language detection failed';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setIsDetecting(false);
+      // Cleanup audio resources
+      audioCaptureRef.current?.cleanup();
+    }
+  }, []);
+
+  const reset = useCallback(() => {
+    setDetectedLanguage(null);
+    setError(null);
+    setIsDetecting(false);
+    audioCaptureRef.current?.cleanup();
+    audioCaptureRef.current = null;
+  }, []);
+
+  return {
+    detectLanguage,
+    isDetecting,
+    detectedLanguage,
+    error,
+    reset,
+  };
+}
+```
+
+
+### 4. Gemini Live Integration Enhancement
+
+#### **File: `src/hooks/useGeminiLive.ts` (Modified)**
+
+Update the existing hook to accept dynamic language configuration:
+
+```typescript
+// Add to the existing useGeminiLive hook interface
+export interface UseGeminiLiveOptions {
+  audioOutput?: boolean;
+  inputLang?: string;  // EXISTING: currently hardcoded to 'nl-NL'
+  systemPrompt?: string;
+  // NEW: Add dynamic language code support
+  dynamicLanguageCode?: string;  // BCP-47 code from Deepgram detection
+}
+
+// Modify the config section in useGeminiLive hook:
+const config = {
+  responseModalities: [Modality.AUDIO],
+  speechConfig: {
+    // Use dynamicLanguageCode if provided, otherwise fall back to inputLang
+    languageCode: options.dynamicLanguageCode || options.inputLang || 'en-US',
+    voiceConfig: {
+      prebuiltVoiceConfig: {
+        voiceName: 'Kore', // Configurable voice
+      },
+    },
+  },
+  // Enable input audio transcription for STT
+  inputAudioTranscription: {},
+  // Enable output audio transcription for debugging
+  outputAudioTranscription: {},
+  // Configure VAD for natural interruptions
+  realtimeInputConfig: {
+    automaticActivityDetection: {
+      disabled: false,
+      startOfSpeechSensitivity: 'START_SENSITIVITY_MEDIUM',
+      endOfSpeechSensitivity: 'END_SENSITIVITY_MEDIUM',
+      prefixPaddingMs: 100,
+      silenceDurationMs: 300,
+    },
+  },
+};
+```
+
+**Critical Addition**: The `inputAudioTranscription` config enables Gemini Live's built-in STT with the detected language.[^2][^4]
+
+### 5. ChatInput Component Integration
+
+#### **File: `src/components/ChatInput.tsx` (Modified)**
+
+Integrate language detection into the mic button workflow:
+
+```typescript
+import { useDeepgramLanguageDetection } from '../hooks/useDeepgramLanguageDetection';
+
+// Inside ChatInput component:
+const {
+  detectLanguage,
+  isDetecting,
+  detectedLanguage,
+  error: detectionError,
+  reset: resetDetection,
+} = useDeepgramLanguageDetection();
+
+// State for detected language display
+const [showLanguageDetection, setShowLanguageDetection] = useState(false);
+
+// Modified handleMicClick function:
+const handleMicClick = async () => {
+  if (isGeminiLiveMode) {
+    if (isGeminiLiveListening) {
+      // Stop listening
+      stopGeminiLive?.();
+      setShowLanguageDetection(false);
+      resetDetection();
+    } else {
+      try {
+        // Step 1: Detect language first
+        setShowLanguageDetection(true);
+        const languageResult = await detectLanguage();
+        
+        console.log('Detected language:', languageResult);
+        
+        // Step 2: Start Gemini Live with detected language
+        // Pass the detected language to useGeminiLive hook
+        startGeminiLive?.(languageResult.geminiLanguageCode);
+        
+        // Show language detection UI for 2 seconds
+        setTimeout(() => {
+          setShowLanguageDetection(false);
+        }, 2000);
+        
+      } catch (error) {
+        console.error('Language detection failed:', error);
+        // Fallback to default language
+        startGeminiLive?.();
+        setShowLanguageDetection(false);
+      }
+    }
+  } else {
+    // Traditional Web Speech API mode (unchanged)
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  }
+};
+
+// Add language detection UI display:
+{showLanguageDetection && detectedLanguage && (
+  <div className="absolute bottom-full mb-2 left-0 bg-gray-800 rounded-lg p-3 shadow-lg border border-green-500/30 animate-fade-in">
+    <div className="flex items-center gap-2">
+      <span className="text-2xl">
+        {detectedLanguage.language === 'nl' ? '🇳🇱' : 
+         detectedLanguage.language === 'en' ? '🇬🇧' :
+         detectedLanguage.language === 'de' ? '🇩🇪' :
+         detectedLanguage.language === 'fr' ? '🇫🇷' : '🌐'}
+      </span>
+      <div>
+        <p className="text-white font-medium">
+          {detectedLanguage.language.toUpperCase()} detected
+        </p>
+        <p className="text-gray-400 text-sm">
+          {Math.round(detectedLanguage.confidence * 100)}% confidence
+        </p>
+      </div>
+    </div>
+  </div>
+)}
+
+{isDetecting && (
+  <div className="absolute bottom-full mb-2 left-0 bg-gray-800 rounded-lg p-3 shadow-lg">
+    <p className="text-white text-sm">🎤 Detecting language...</p>
+  </div>
+)}
+```
+
+
+### 6. Modified useGeminiLive Hook Signature
+
+Update the hook to accept dynamic language:
+
+```typescript
+// Modify startGeminiLive to accept optional language parameter
+export function useGeminiLive(options: UseGeminiLiveOptions) {
+  const [dynamicLanguage, setDynamicLanguage] = useState<string | null>(null);
+  
+  const startGeminiLive = useCallback((detectedLanguageCode?: string) => {
+    if (detectedLanguageCode) {
+      setDynamicLanguage(detectedLanguageCode);
+    }
+    // Existing start logic with updated config
+    startListening();
+  }, []);
+  
+  // Use dynamicLanguage in config
+  const config = {
+    speechConfig: {
+      languageCode: dynamicLanguage || options.inputLang || 'en-US',
+      // ... rest of config
+    },
+  };
+  
+  return { startGeminiLive, /* other returns */ };
+}
+```
+
+
+## Mobile-Specific Considerations
+
+### iOS Safari Compatibility
+
+Mobile Safari requires user interaction to access microphone:
+
+```typescript
+// Add to audioCapture.ts
+export function isMobileSafari(): boolean {
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+}
+
+// Request permission explicitly on mobile
+if (isMobileSafari()) {
+  // Must be triggered by user gesture
+  await navigator.mediaDevices.getUserMedia({ audio: true });
+}
+```
+
+
+### Android Chrome Optimization
+
+```typescript
+// Optimize for Android Chrome
+const constraints = {
+  audio: {
+    channelCount: 1,
+    sampleRate: 16000,
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    // Android-specific
+    googEchoCancellation: true,
+    googNoiseSuppression: true,
+    googAutoGainControl: true,
+  },
+};
+```
+
+
+## Environment Variables Setup
+
+Add to Vercel dashboard (already configured according to spec):
+
+```bash
+DEEPGRAM_API_KEY=your_deepgram_key_here
+GEMINI_API_KEY=your_gemini_key_here
+```
+
+Access in Vercel functions via `process.env.DEEPGRAM_API_KEY`.[^1][^2]
+
+## Testing on Mobile
+
+1. **Deploy to Vercel** (localhost won't work for mobile HTTPS requirement)
+2. **Test on real devices**, not emulators
+3. **Grant microphone permissions** when prompted
+4. **Speak for 2 seconds** for initial detection
+5. **Verify language display** shows detected language
+6. **Continue speaking** to test Gemini Live STT with correct language
+
+## Key Improvements Over Original Spec
+
+1. **Language Mapping**: Added Deepgram→Gemini BCP-47 code mapping[^4]
+2. **Mobile Audio Processing**: PCM conversion works on iOS/Android[^5]
+3. **Dynamic Language Injection**: Gemini Live config accepts detected language[^4]
+4. **Error Handling**: Graceful fallback to default language
+5. **UI Feedback**: Real-time language detection display
+6. **VAD Configuration**: Optimized for natural conversation flow[^4]
+7. **Input Audio Transcription**: Enabled in Gemini Live for accurate STT[^4]
+
+## Cost Optimization
+
+- Language detection: ~\$0.0001 per 2-second sample[^1]
+- Cache detected language in session storage
+- Only detect once per conversation session
+- Estimated: **\$0.10/month for 100 users**[^1]
+
+This implementation ensures Deepgram detects the language, then Gemini Live uses that language code for accurate bidirectional speech-to-text on mobile devices.[^3][^2][^1][^4]
+<span style="display:none">[^10][^11][^12][^13][^14][^15][^16][^17][^18][^19][^20][^21][^22][^6][^7][^8][^9]</span>
+
+<div align="center">⁂</div>
+
+[^1]: DEEPGRAM_STT_SPECIFICATION.md
+
+[^2]: repomix-output.xml
+
+[^3]: https://deepgram.com/learn/introducing-automatic-language-detection-capabilities
+
+[^4]: https://ai.google.dev/gemini-api/docs/live-guide
+
+[^5]: https://deepgram.com/learn/live-transcription-mic-browser
+
+[^6]: https://deepgram.com/learn/best-speech-to-text-apis
+
+[^7]: https://deepgram.com/learn/nova-2-best-speech-to-text-api-multiple-languages
+
+[^8]: https://deepgram.com/learn/speech-to-text-api-pricing-breakdown-2025
+
+[^9]: https://deepgram.com/learn/deepgram-language-detection-conlang-experiment
+
+[^10]: https://stackoverflow.com/questions/79597615/change-the-language-of-voximplants-gemini-live-api-client
+
+[^11]: https://deepgram.com/learn/fetch-hosted-audio-streams-in-the-browser
+
+[^12]: https://developers.deepgram.com/changelog/speech-to-text-changelog/2025/3/31
+
+[^13]: https://github.com/orgs/deepgram/discussions/564
+
+[^14]: https://ai.google.dev/gemini-api/docs/live
+
+[^15]: https://developers.deepgram.com/docs/lower-level-websockets
+
+[^16]: https://deepgram.com/learn/introducing-nova-3-speech-to-text-api
+
+[^17]: https://cloud.google.com/vertex-ai/generative-ai/docs/live-api
+
+[^18]: https://developers.deepgram.com/docs/tts-websocket
+
+[^19]: https://developers.deepgram.com/changelog/speech-to-text-changelog
+
+[^20]: https://support.google.com/gemini/answer/15984485?hl=en\&co=GENIE.Platform%3DAndroid
+
+[^21]: https://developers.deepgram.com/docs/getting-started-with-the-streaming-test-suite
+
+[^22]: https://geneo.app/query-reports/best-speech-recognition-api-developers
 </file>
 
 <file path="hooks/useTextToSpeech.ts">
@@ -2481,239 +2960,6 @@ style.textContent = `
 document.head.appendChild(style);
 </file>
 
-<file path="src/hooks/useGeminiLive.ts">
-// src/hooks/useGeminiLive.ts
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { GoogleGenAI, Modality } from '@google/genai';
-
-type LiveState = {
-  isConnected: boolean;
-  isListening: boolean;
-  isSpeaking: boolean;
-  interimTranscript: string;
-  finalTranscript: string;
-  llmResponse: string;
-  error: string | null;
-};
-
-type LiveConfig = {
-  // Toggle native audio output on/off (AUDIO vs TEXT)
-  audioOutput?: boolean; // default true
-  // Force Dutch input transcription
-  inputLang?: string; // default 'nl-NL'
-  // Optional: custom system prompt
-  systemPrompt?: string;
-};
-
-export const useGeminiLive = (config: LiveConfig = {}) => {
-  const [state, setState] = useState<LiveState>({
-    isConnected: false,
-    isListening: false,
-    isSpeaking: false,
-    interimTranscript: '',
-    finalTranscript: '',
-    llmResponse: '',
-    error: null,
-  });
-
-  const aiRef = useRef<GoogleGenAI | null>(null);
-  const sessionRef = useRef<any>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const workletRef = useRef<AudioWorkletNode | ScriptProcessorNode | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-
-  const audioOutput = config.audioOutput !== false; // default true
-  const inputLang = config.inputLang || 'nl-NL';
-  const MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
-
-  const initAudioContext = useCallback(async () => {
-    if (!audioCtxRef.current) {
-      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      if (audioCtxRef.current.state === 'suspended') {
-        await audioCtxRef.current.resume();
-      }
-    }
-  }, []);
-
-  const playPcm = useCallback(async (pcmBase64: string, sampleRate = 24000) => {
-    try {
-      await initAudioContext();
-      if (!audioCtxRef.current) return;
-
-      const bytes = Uint8Array.from(atob(pcmBase64), c => c.charCodeAt(0));
-      const samples = bytes.length / 2;
-      const audioBuffer = audioCtxRef.current.createBuffer(1, samples, sampleRate);
-      const ch = audioBuffer.getChannelData(0);
-
-      for (let i = 0; i < samples; i++) {
-        const lo = bytes[i * 2];
-        const hi = bytes[i * 2 + 1];
-        const val = (hi << 8) | lo;
-        const s = val >= 0x8000 ? val - 0x10000 : val; // int16
-        ch[i] = s / 32768;
-      }
-
-      const src = audioCtxRef.current.createBufferSource();
-      src.buffer = audioBuffer;
-      src.connect(audioCtxRef.current.destination);
-      src.start();
-
-      setState(s => ({ ...s, isSpeaking: true }));
-      src.onended = () => setState(s => ({ ...s, isSpeaking: false }));
-    } catch (e) {
-      console.error('Audio playback error', e);
-    }
-  }, [initAudioContext]);
-
-  const connect = useCallback(async () => {
-    try {
-      setState(s => ({ ...s, error: null }));
-      // 1) Get ephemeral token from our Vercel function
-      const r = await fetch('/api/generate-token', { method: 'POST' });
-      if (!r.ok) throw new Error('Failed to fetch ephemeral token');
-      const { ephemeralToken } = await r.json();
-
-      // 2) Create SDK with ephemeral token
-      aiRef.current = new GoogleGenAI({ apiKey: ephemeralToken });
-
-      // 3) Connect to Live session
-      sessionRef.current = await aiRef.current.live.connect({
-        model: MODEL,
-        config: {
-          responseModalities: [audioOutput ? Modality.AUDIO : Modality.TEXT],
-          inputAudioTranscription: { language: inputLang },    // Dutch STT
-          outputAudioTranscription: {},                        // Show agent transcript text
-          ...(config.systemPrompt
-            ? { systemInstruction: config.systemPrompt }
-            : {}),
-        },
-        callbacks: {
-          onopen: () => setState(s => ({ ...s, isConnected: true })),
-          onmessage: (msg: any) => {
-            // Streamed audio chunks
-            if (audioOutput && msg.audio?.data) {
-              const sr = msg.audio.sampleRateHz || 24000;
-              playPcm(msg.audio.data, sr);
-            }
-            // Transcripts
-            if (msg.serverContent?.inputTranscription?.text) {
-              setState(s => ({ ...s, interimTranscript: msg.serverContent.inputTranscription.text }));
-            }
-            if (msg.serverContent?.outputTranscription?.text) {
-              // Accumulate model's text transcript too (useful when audioOutput is on)
-              setState(s => ({ ...s, llmResponse: msg.serverContent.outputTranscription.text }));
-            }
-            // Final-turn text (when responseModalities = TEXT)
-            if (msg.serverContent?.modelTurn?.parts) {
-              const text = msg.serverContent.modelTurn.parts.map((p: any) => p.text || '').join('');
-              if (text) setState(s => ({ ...s, llmResponse: text }));
-            }
-          },
-          onerror: (e: any) => setState(s => ({ ...s, error: e?.message || 'Live error' })),
-          onclose: () => setState(s => ({ ...s, isConnected: false, isListening: false })),
-        },
-      });
-    } catch (e: any) {
-      console.error('Live connect error', e);
-      setState(s => ({ ...s, error: e?.message || 'Connect failed' }));
-    }
-  }, [audioOutput, inputLang, config.systemPrompt, playPcm]);
-
-  const startListening = useCallback(async () => {
-    await initAudioContext();
-    if (!sessionRef.current) await connect();
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-      mediaStreamRef.current = stream;
-
-      // Prefer AudioWorklet (with proper downsampling handled inside the worklet file)
-      try {
-        await audioCtxRef.current!.audioWorklet.addModule('/audio-processor-worklet.js');
-        const node = new AudioWorkletNode(audioCtxRef.current!, 'pcm16k-downsampler');
-        node.port.onmessage = (ev) => {
-          if (ev.data?.type === 'pcm16') {
-            const bytes: Uint8Array = ev.data.data;
-            const base64 = btoa(String.fromCharCode(...bytes));
-            sessionRef.current?.sendRealtimeInput({
-              audio: { data: base64, mimeType: 'audio/pcm;rate=16000' },
-            });
-          }
-        };
-        const src = audioCtxRef.current!.createMediaStreamSource(stream);
-        src.connect(node);
-        workletRef.current = node;
-      } catch {
-        // Fallback: ScriptProcessor (also downsample in the worklet file—see below)
-        const bufSize = 2048;
-        const proc = audioCtxRef.current!.createScriptProcessor(bufSize, 1, 1);
-        const src = audioCtxRef.current!.createMediaStreamSource(stream);
-        src.connect(proc);
-        proc.onaudioprocess = (e) => {
-          // For fallback path, we'll still post raw 16k int16 frames from the worklet file,
-          // but if you keep this, ensure downsampling here too.
-        };
-        proc.connect(audioCtxRef.current!.destination);
-        workletRef.current = proc;
-      }
-
-      setState(s => ({ ...s, isListening: true }));
-    } catch (e: any) {
-      console.error('Mic error', e);
-      setState(s => ({ ...s, error: 'Microphone access denied' }));
-    }
-  }, [connect, initAudioContext]);
-
-  const stopListening = useCallback(() => {
-    if (workletRef.current) {
-      try { (workletRef.current as any).disconnect(); } catch {}
-      workletRef.current = null;
-    }
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(t => t.stop());
-      mediaStreamRef.current = null;
-    }
-    setState(s => ({ ...s, isListening: false }));
-  }, []);
-
-  const sendText = useCallback((text: string) => {
-    sessionRef.current?.sendClientContent({
-      turns: [{ role: 'user', parts: [{ text }] }],
-      turnComplete: true,
-    });
-  }, []);
-
-  const disconnect = useCallback(async () => {
-    stopListening();
-    try { await sessionRef.current?.close?.(); } catch {}
-    sessionRef.current = null;
-    setState({
-      isConnected: false,
-      isListening: false,
-      isSpeaking: false,
-      interimTranscript: '',
-      finalTranscript: '',
-      llmResponse: '',
-      error: null,
-    });
-  }, [stopListening]);
-
-  useEffect(() => () => { disconnect(); }, [disconnect]);
-
-  return {
-    ...state,
-    connect,
-    disconnect,
-    startListening,
-    stopListening,
-    sendText,
-    isSupported: !!window.AudioContext && !!navigator.mediaDevices?.getUserMedia,
-  };
-};
-</file>
-
 <file path="src/hooks/useGeminiLive.ts.backup">
 // src/hooks/useGeminiLive.ts
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -3361,6 +3607,191 @@ declare global {
 }
 
 export {};
+</file>
+
+<file path="src/utils/audioCapture.ts">
+export interface AudioCaptureResult {
+  base64Audio: string;
+  mimeType: string;
+  duration: number;
+}
+
+export class AudioCaptureManager {
+  private mediaStream: MediaStream | null = null;
+  private audioContext: AudioContext | null = null;
+  private mediaRecorder: MediaRecorder | null = null;
+  private audioChunks: Blob[] = [];
+
+  /**
+   * Request microphone permission and initialize audio context
+   */
+  async initialize(): Promise<void> {
+    try {
+      // Request microphone with optimal settings for speech
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1, // Mono
+          sampleRate: 16000, // 16kHz for Deepgram
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      // Create audio context for processing
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+        sampleRate: 16000,
+      });
+
+    } catch (error) {
+      console.error('Microphone access denied:', error);
+      throw new Error('Microphone permission required');
+    }
+  }
+
+  /**
+   * Capture initial audio sample for language detection
+   * @param durationMs Duration in milliseconds (default: 2000ms)
+   */
+  async captureInitialSample(durationMs: number = 2000): Promise<AudioCaptureResult> {
+    if (!this.mediaStream) {
+      throw new Error('Audio capture not initialized');
+    }
+
+    return new Promise((resolve, reject) => {
+      this.audioChunks = [];
+
+      // Use MediaRecorder for browser compatibility
+      const options: MediaRecorderOptions = {
+        mimeType: 'audio/webm;codecs=opus', // Wide browser support
+      };
+
+      this.mediaRecorder = new MediaRecorder(this.mediaStream!, options);
+
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          this.audioChunks.push(event.data);
+        }
+      };
+
+      this.mediaRecorder.onstop = async () => {
+        try {
+          const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+          
+          // Convert to PCM Int16 for Deepgram
+          const pcmData = await this.convertToPCM(audioBlob);
+          const base64Audio = this.arrayBufferToBase64(pcmData);
+
+          resolve({
+            base64Audio,
+            mimeType: 'audio/pcm;rate=16000',
+            duration: durationMs,
+          });
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      this.mediaRecorder.start();
+
+      // Stop after specified duration
+      setTimeout(() => {
+        this.mediaRecorder?.stop();
+      }, durationMs);
+    });
+  }
+
+  /**
+   * Convert WebM/Opus audio to PCM Int16 format for Deepgram
+   */
+  private async convertToPCM(audioBlob: Blob): Promise<ArrayBuffer> {
+    if (!this.audioContext) {
+      throw new Error('Audio context not initialized');
+    }
+
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+    // Get audio data (mono channel)
+    const channelData = audioBuffer.getChannelData(0);
+
+    // Convert Float32 to Int16 PCM
+    const pcmData = new Int16Array(channelData.length);
+    for (let i = 0; i < channelData.length; i++) {
+      // Clamp to [-1, 1] and convert to 16-bit integer
+      const sample = Math.max(-1, Math.min(1, channelData[i]));
+      pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+    }
+
+    return pcmData.buffer;
+  }
+
+  /**
+   * Convert ArrayBuffer to base64 string
+   */
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  /**
+   * Start streaming audio for continuous transcription
+   */
+  startStreaming(onAudioChunk: (chunk: ArrayBuffer) => void): void {
+    if (!this.mediaStream || !this.audioContext) {
+      throw new Error('Audio capture not initialized');
+    }
+
+    const source = this.audioContext.createMediaStreamSource(this.mediaStream);
+    const processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+
+    processor.onaudioprocess = (event) => {
+      const inputData = event.inputBuffer.getChannelData(0);
+      const pcmData = new Int16Array(inputData.length);
+      
+      for (let i = 0; i < inputData.length; i++) {
+        const sample = Math.max(-1, Math.min(1, inputData[i]));
+        pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+      }
+
+      onAudioChunk(pcmData.buffer);
+    };
+
+    source.connect(processor);
+    processor.connect(this.audioContext.destination);
+  }
+
+  /**
+   * Clean up resources
+   */
+  cleanup(): void {
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      this.mediaRecorder.stop();
+    }
+
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach(track => track.stop());
+      this.mediaStream = null;
+    }
+
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+  }
+}
+
+/**
+ * Detect if running on mobile Safari
+ */
+export function isMobileSafari(): boolean {
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+}
 </file>
 
 <file path="src/utils/documentStorage.ts">
@@ -5098,6 +5529,129 @@ export const Header: React.FC<HeaderProps> = ({ isTtsEnabled, setIsTtsEnabled, i
 };
 </file>
 
+<file path="docs/DEEPGRAM_STT_SPECIFICATION.md">
+# Enhanced Deepgram STT Specification for Language Detection with Gemini Live Integration
+
+Based on the codebase analysis and research, here's the comprehensive specification with implementation details for integrating Deepgram language detection with Gemini Live API language configuration.
+
+## Critical Implementation Gap Identified
+
+The original specification missed a **crucial integration point**: Deepgram language detection must dynamically set the `languageCode` in Gemini Live's `speechConfig` to ensure proper bidirectional speech recognition.[1][2][3][4]
+
+## Enhanced Architecture Overview
+
+The implementation requires a two-stage approach:
+1. **Stage 1**: Deepgram detects language from initial audio sample (1-2 seconds)
+2. **Stage 2**: Pass detected language to Gemini Live session configuration for proper STT
+
+## Complete Implementation Guide
+
+### 1. Backend API Implementation
+
+#### **File: `api/deepgram-language-detect.ts`**
+
+This Vercel serverless function performs initial language detection:
+
+```typescript
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient } from '@deepgram/sdk';
+
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
+  // Enable CORS for Vercel deployment
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { audioBase64 } = req.body;
+
+    if (!audioBase64) {
+      return res.status(400).json({ error: 'Audio data required' });
+    }
+
+    // Initialize Deepgram client with Vercel environment variable
+    const deepgram = createClient(process.env.DEEPGRAM_API_KEY!);
+
+    // Convert base64 to buffer
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+
+    // Call Deepgram Prerecorded API with language detection
+    const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
+      audioBuffer,
+      {
+        model: 'nova-2',
+        detect_language: true,
+        punctuate: true,
+        smart_format: true,
+      }
+    );
+
+    if (error) {
+      console.error('Deepgram API error:', error);
+      return res.status(500).json({ error: 'Language detection failed' });
+    }
+
+    // Extract detected language from response
+    const detectedLanguage = result.results.channels[0].detected_language;
+    const confidence = result.results.channels[0].alternatives[0].confidence;
+    const alternatives = result.results.channels[0].language_alternatives || [];
+
+    // Map Deepgram language codes to Gemini Live BCP-47 codes
+    const languageMapping: Record<string, string> = {
+      'nl': 'nl-NL',
+      'en': 'en-US',
+      'de': 'de-DE',
+      'fr': 'fr-FR',
+      'es': 'es-ES',
+      'it': 'it-IT',
+      'pt': 'pt-BR',
+      'ja': 'ja-JP',
+      'ko': 'ko-KR',
+      'hi': 'hi-IN',
+      'ar': 'ar-XA',
+      'tr': 'tr-TR',
+      'vi': 'vi-VN',
+      'id': 'id-ID',
+      'pl': 'pl-PL',
+      'ru': 'ru-RU',
+      'th': 'th-TH',
+    };
+
+    const geminiLanguageCode = languageMapping[detectedLanguage] || 'en-US';
+
+    return res.status(200).json({
+      language: detectedLanguage,
+      geminiLanguageCode,
+      confidence,
+      alternatives: alternatives.map((alt: any) => ({
+        language: alt.language,
+        confidence: alt.confidence,
+        geminiLanguageCode: languageMapping[alt.language] || 'en-US',
+      })),
+      transcript: result.results.channels[0].alternatives[0].transcript,
+    });
+
+  } catch (error) {
+    console.error('Server error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+```
+
+**Key Enhancement**: Added language mapping from Deepgram codes to Gemini Live BCP-47 codes.[4][1]
+</file>
+
 <file path="src/components/CircularProgress.tsx">
 import React from 'react';
 
@@ -5683,6 +6237,340 @@ export const useSettings = (): SettingsContextType => {
   }
   
   return context;
+};
+</file>
+
+<file path="src/hooks/useDeepgramLanguageDetection.ts">
+import { useState, useCallback, useRef } from 'react';
+import { AudioCaptureManager } from '../utils/audioCapture';
+
+export interface LanguageDetectionResult {
+  language: string;
+  geminiLanguageCode: string;
+  confidence: number;
+  alternatives?: Array<{
+    language: string;
+    confidence: number;
+    geminiLanguageCode: string;
+  }>;
+}
+
+export interface UseDeepgramLanguageDetectionReturn {
+  detectLanguage: () => Promise<LanguageDetectionResult>;
+  isDetecting: boolean;
+  detectedLanguage: LanguageDetectionResult | null;
+  error: string | null;
+  reset: () => void;
+}
+
+export function useDeepgramLanguageDetection(): UseDeepgramLanguageDetectionReturn {
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [detectedLanguage, setDetectedLanguage] = useState<LanguageDetectionResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const audioCaptureRef = useRef<AudioCaptureManager | null>(null);
+
+  const detectLanguage = useCallback(async (): Promise<LanguageDetectionResult> => {
+    setIsDetecting(true);
+    setError(null);
+
+    try {
+      // Initialize audio capture
+      if (!audioCaptureRef.current) {
+        audioCaptureRef.current = new AudioCaptureManager();
+      }
+      await audioCaptureRef.current.initialize();
+
+      // Capture 2-second audio sample
+      const audioSample = await audioCaptureRef.current.captureInitialSample(2000);
+
+      // Send to Vercel serverless function
+      const response = await fetch('/api/deepgram-language-detect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          audioBase64: audioSample.base64Audio,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('===== DEEPGRAM API ERROR RESPONSE =====');
+        console.error('Status:', response.status);
+        console.error('Error Data:', errorData);
+        console.error('Debug Info:', errorData.debug);
+        console.error('======================================');
+        throw new Error(`Language detection API failed: ${JSON.stringify(errorData)}`);
+      }
+
+      const result: LanguageDetectionResult = await response.json();
+      setDetectedLanguage(result);
+      
+      return result;
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Language detection failed';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setIsDetecting(false);
+      // Cleanup audio resources
+      audioCaptureRef.current?.cleanup();
+    }
+  }, []);
+
+  const reset = useCallback(() => {
+    setDetectedLanguage(null);
+    setError(null);
+    setIsDetecting(false);
+    audioCaptureRef.current?.cleanup();
+    audioCaptureRef.current = null;
+  }, []);
+
+  return {
+    detectLanguage,
+    isDetecting,
+    detectedLanguage,
+    error,
+    reset,
+  };
+}
+</file>
+
+<file path="src/hooks/useGeminiLive.ts">
+// src/hooks/useGeminiLive.ts
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { GoogleGenAI, Modality } from '@google/genai';
+
+type LiveState = {
+  isConnected: boolean;
+  isListening: boolean;
+  isSpeaking: boolean;
+  interimTranscript: string;
+  finalTranscript: string;
+  llmResponse: string;
+  error: string | null;
+};
+
+type LiveConfig = {
+  // Toggle native audio output on/off (AUDIO vs TEXT)
+  audioOutput?: boolean; // default true
+  // Force Dutch input transcription
+  inputLang?: string; // default 'nl-NL'
+  // Optional: custom system prompt
+  systemPrompt?: string;
+  // NEW: Dynamic language code from Deepgram detection
+  dynamicLanguageCode?: string; // BCP-47 code from language detection
+};
+
+export const useGeminiLive = (config: LiveConfig = {}) => {
+  const [state, setState] = useState<LiveState>({
+    isConnected: false,
+    isListening: false,
+    isSpeaking: false,
+    interimTranscript: '',
+    finalTranscript: '',
+    llmResponse: '',
+    error: null,
+  });
+
+  const aiRef = useRef<GoogleGenAI | null>(null);
+  const sessionRef = useRef<any>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const workletRef = useRef<AudioWorkletNode | ScriptProcessorNode | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+
+  const audioOutput = config.audioOutput !== false; // default true
+  // Use dynamicLanguageCode if provided, otherwise fall back to inputLang
+  const inputLang = config.dynamicLanguageCode || config.inputLang || 'nl-NL';
+  const MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
+
+  const initAudioContext = useCallback(async () => {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (audioCtxRef.current.state === 'suspended') {
+        await audioCtxRef.current.resume();
+      }
+    }
+  }, []);
+
+  const playPcm = useCallback(async (pcmBase64: string, sampleRate = 24000) => {
+    try {
+      await initAudioContext();
+      if (!audioCtxRef.current) return;
+
+      const bytes = Uint8Array.from(atob(pcmBase64), c => c.charCodeAt(0));
+      const samples = bytes.length / 2;
+      const audioBuffer = audioCtxRef.current.createBuffer(1, samples, sampleRate);
+      const ch = audioBuffer.getChannelData(0);
+
+      for (let i = 0; i < samples; i++) {
+        const lo = bytes[i * 2];
+        const hi = bytes[i * 2 + 1];
+        const val = (hi << 8) | lo;
+        const s = val >= 0x8000 ? val - 0x10000 : val; // int16
+        ch[i] = s / 32768;
+      }
+
+      const src = audioCtxRef.current.createBufferSource();
+      src.buffer = audioBuffer;
+      src.connect(audioCtxRef.current.destination);
+      src.start();
+
+      setState(s => ({ ...s, isSpeaking: true }));
+      src.onended = () => setState(s => ({ ...s, isSpeaking: false }));
+    } catch (e) {
+      console.error('Audio playback error', e);
+    }
+  }, [initAudioContext]);
+
+  const connect = useCallback(async () => {
+    try {
+      setState(s => ({ ...s, error: null }));
+      // 1) Get ephemeral token from our Vercel function
+      const r = await fetch('/api/generate-token', { method: 'POST' });
+      if (!r.ok) throw new Error('Failed to fetch ephemeral token');
+      const { ephemeralToken } = await r.json();
+
+      // 2) Create SDK with ephemeral token
+      aiRef.current = new GoogleGenAI({ apiKey: ephemeralToken });
+
+      // 3) Connect to Live session
+      sessionRef.current = await aiRef.current.live.connect({
+        model: MODEL,
+        config: {
+          responseModalities: [audioOutput ? Modality.AUDIO : Modality.TEXT],
+          inputAudioTranscription: { language: inputLang },    // Dutch STT
+          outputAudioTranscription: {},                        // Show agent transcript text
+          ...(config.systemPrompt
+            ? { systemInstruction: config.systemPrompt }
+            : {}),
+        },
+        callbacks: {
+          onopen: () => setState(s => ({ ...s, isConnected: true })),
+          onmessage: (msg: any) => {
+            // Streamed audio chunks
+            if (audioOutput && msg.audio?.data) {
+              const sr = msg.audio.sampleRateHz || 24000;
+              playPcm(msg.audio.data, sr);
+            }
+            // Transcripts
+            if (msg.serverContent?.inputTranscription?.text) {
+              setState(s => ({ ...s, interimTranscript: msg.serverContent.inputTranscription.text }));
+            }
+            if (msg.serverContent?.outputTranscription?.text) {
+              // Accumulate model's text transcript too (useful when audioOutput is on)
+              setState(s => ({ ...s, llmResponse: msg.serverContent.outputTranscription.text }));
+            }
+            // Final-turn text (when responseModalities = TEXT)
+            if (msg.serverContent?.modelTurn?.parts) {
+              const text = msg.serverContent.modelTurn.parts.map((p: any) => p.text || '').join('');
+              if (text) setState(s => ({ ...s, llmResponse: text }));
+            }
+          },
+          onerror: (e: any) => setState(s => ({ ...s, error: e?.message || 'Live error' })),
+          onclose: () => setState(s => ({ ...s, isConnected: false, isListening: false })),
+        },
+      });
+    } catch (e: any) {
+      console.error('Live connect error', e);
+      setState(s => ({ ...s, error: e?.message || 'Connect failed' }));
+    }
+  }, [audioOutput, inputLang, config.systemPrompt, playPcm]);
+
+  const startListening = useCallback(async () => {
+    await initAudioContext();
+    if (!sessionRef.current) await connect();
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      mediaStreamRef.current = stream;
+
+      // Prefer AudioWorklet (with proper downsampling handled inside the worklet file)
+      try {
+        await audioCtxRef.current!.audioWorklet.addModule('/audio-processor-worklet.js');
+        const node = new AudioWorkletNode(audioCtxRef.current!, 'pcm16k-downsampler');
+        node.port.onmessage = (ev) => {
+          if (ev.data?.type === 'pcm16') {
+            const bytes: Uint8Array = ev.data.data;
+            const base64 = btoa(String.fromCharCode(...bytes));
+            sessionRef.current?.sendRealtimeInput({
+              audio: { data: base64, mimeType: 'audio/pcm;rate=16000' },
+            });
+          }
+        };
+        const src = audioCtxRef.current!.createMediaStreamSource(stream);
+        src.connect(node);
+        workletRef.current = node;
+      } catch {
+        // Fallback: ScriptProcessor (also downsample in the worklet file—see below)
+        const bufSize = 2048;
+        const proc = audioCtxRef.current!.createScriptProcessor(bufSize, 1, 1);
+        const src = audioCtxRef.current!.createMediaStreamSource(stream);
+        src.connect(proc);
+        proc.onaudioprocess = (e) => {
+          // For fallback path, we'll still post raw 16k int16 frames from the worklet file,
+          // but if you keep this, ensure downsampling here too.
+        };
+        proc.connect(audioCtxRef.current!.destination);
+        workletRef.current = proc;
+      }
+
+      setState(s => ({ ...s, isListening: true }));
+    } catch (e: any) {
+      console.error('Mic error', e);
+      setState(s => ({ ...s, error: 'Microphone access denied' }));
+    }
+  }, [connect, initAudioContext]);
+
+  const stopListening = useCallback(() => {
+    if (workletRef.current) {
+      try { (workletRef.current as any).disconnect(); } catch {}
+      workletRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(t => t.stop());
+      mediaStreamRef.current = null;
+    }
+    setState(s => ({ ...s, isListening: false }));
+  }, []);
+
+  const sendText = useCallback((text: string) => {
+    sessionRef.current?.sendClientContent({
+      turns: [{ role: 'user', parts: [{ text }] }],
+      turnComplete: true,
+    });
+  }, []);
+
+  const disconnect = useCallback(async () => {
+    stopListening();
+    try { await sessionRef.current?.close?.(); } catch {}
+    sessionRef.current = null;
+    setState({
+      isConnected: false,
+      isListening: false,
+      isSpeaking: false,
+      interimTranscript: '',
+      finalTranscript: '',
+      llmResponse: '',
+      error: null,
+    });
+  }, [stopListening]);
+
+  useEffect(() => () => { disconnect(); }, [disconnect]);
+
+  return {
+    ...state,
+    connect,
+    disconnect,
+    startListening,
+    stopListening,
+    sendText,
+    isSupported: !!window.AudioContext && !!navigator.mediaDevices?.getUserMedia,
+  };
 };
 </file>
 
@@ -7932,259 +8820,6 @@ This project is part of the Kijko Video Brief Assistant system.
 This is the frontend component of a larger video production workflow system. For other components or enterprise features, please contact the development team.
 </file>
 
-<file path="src/components/ChatInput.tsx">
-import React, { useState, useRef, useEffect } from 'react';
-import { Attachment } from '../types';
-import { SendIcon } from './icons/SendIcon';
-import { AttachmentIcon } from './icons/AttachmentIcon';
-import { XCircleIcon } from './icons/FileIcons';
-import { MicrophoneIcon } from './icons/MicrophoneIcon';
-
-interface ChatInputProps {
-  onSendMessage: (text: string, attachments: Attachment[]) => void;
-  isLoading: boolean;
-  isListening: boolean;
-  startListening: () => void;
-  stopListening: () => void;
-  transcript: string;
-  isSttSupported: boolean;
-  // Gemini Live props
-  isGeminiLiveMode?: boolean;
-  startGeminiLive?: () => void;
-  stopGeminiLive?: () => void;
-  isGeminiLiveListening?: boolean;
-  isGeminiLiveSupported?: boolean;
-}
-
-const MAX_FILES = 5;
-const MAX_FILE_SIZE_MB = 20;
-
-const fileToBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve((reader.result as string).split(',')[1]);
-    reader.onerror = (error) => reject(error);
-  });
-
-export const ChatInput: React.FC<ChatInputProps> = ({ 
-    onSendMessage, 
-    isLoading, 
-    isListening, 
-    startListening, 
-    stopListening,
-    transcript,
-    isSttSupported,
-    // Gemini Live props
-    isGeminiLiveMode = false,
-    startGeminiLive,
-    stopGeminiLive,
-    isGeminiLiveListening = false,
-    isGeminiLiveSupported = false,
-}) => {
-  const [text, setText] = useState('');
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const textAreaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    setText(transcript);
-  }, [transcript]);
-
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textAreaRef.current) {
-      textAreaRef.current.style.height = 'auto';
-      textAreaRef.current.style.height = `${textAreaRef.current.scrollHeight}px`;
-    }
-  }, [text]);
-
-
-  const handleSendMessage = () => {
-    if (isLoading || (!text.trim() && attachments.length === 0)) return;
-    onSendMessage(text, attachments);
-    setText('');
-    setAttachments([]);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    if (attachments.length + files.length > MAX_FILES) {
-        alert(`You can only upload a maximum of ${MAX_FILES} files.`);
-        return;
-    }
-
-    const newAttachments: Attachment[] = [];
-    for (const file of files) {
-        if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-            alert(`File ${file.name} is too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
-            continue;
-        }
-        try {
-            const data = await fileToBase64(file);
-            newAttachments.push({ name: file.name, type: file.type, size: file.size, data });
-        } catch (error) {
-            console.error("Error converting file to base64", error);
-        }
-    }
-    setAttachments(prev => [...prev, ...newAttachments]);
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleMicClick = () => {
-      if (isGeminiLiveMode) {
-          // Gemini Live mode
-          if (isGeminiLiveListening) {
-              stopGeminiLive?.();
-          } else {
-              startGeminiLive?.();
-          }
-      } else {
-          // Traditional Web Speech API mode
-          if (isListening) {
-              stopListening();
-          } else {
-              startListening();
-          }
-      }
-  }
-
-  return (
-    <div className="p-6 border-t border-white/10 flex-shrink-0" style={{ background: 'var(--bg-input)' }}>
-      <div className="relative">
-        {/* Composer Container */}
-        <div className="glass rounded-2xl border border-white/10 overflow-hidden">
-          {/* Attachments Preview */}
-          {attachments.length > 0 && (
-            <div className="p-4 border-b border-white/10">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                {attachments.map((file, index) => (
-                  <div key={index} className="bg-gray-700/50 p-3 rounded-xl flex items-center justify-between text-sm backdrop-blur">
-                    <span className="truncate text-white/90" title={file.name}>{file.name}</span>
-                    <button 
-                      onClick={() => removeAttachment(index)} 
-                      className="ml-2 text-gray-400 hover:text-red-400 transition-colors p-1 rounded-md hover:bg-red-500/10"
-                      aria-label={`Remove ${file.name}`}
-                    >
-                      <XCircleIcon className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* Input Row */}
-          <div className="flex items-end p-2">
-            {/* Attachment Button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="p-3 text-gray-400 hover:text-white transition-all duration-200 rounded-lg hover:bg-white/5 focus-ring"
-              aria-label="Attach files"
-              title="Attach files"
-            >
-              <AttachmentIcon className="w-5 h-5" />
-            </button>
-            
-            {/* Microphone Button */}
-            <button
-              onClick={handleMicClick}
-              disabled={isGeminiLiveMode ? !isGeminiLiveSupported : !isSttSupported}
-              className={`
-                p-3 transition-all duration-200 rounded-lg focus-ring
-                disabled:opacity-50 disabled:cursor-not-allowed
-                ${(isGeminiLiveMode ? isGeminiLiveListening : isListening)
-                  ? 'text-red-400 bg-red-500/10 animate-glow-pulse' 
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }
-                ${isGeminiLiveMode ? 'ring-2 ring-blue-500/30' : ''}
-              `}
-              aria-label={(isGeminiLiveMode ? isGeminiLiveListening : isListening) ? 'Stop listening' : 'Start listening'}
-              title={
-                isGeminiLiveMode 
-                  ? (isGeminiLiveSupported 
-                      ? (isGeminiLiveListening ? 'Stop Gemini Live conversation' : 'Start Gemini Live conversation')
-                      : 'Gemini Live is not supported in your browser')
-                  : (isSttSupported 
-                      ? (isListening ? 'Stop listening' : 'Start listening') 
-                      : 'Speech-to-text is not supported in your browser')
-              }
-            >
-              <MicrophoneIcon className="w-5 h-5" />
-            </button>
-            
-            {/* Hidden File Input */}
-            <input
-              type="file"
-              multiple
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              className="hidden"
-              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
-            />
-            
-            {/* Text Input */}
-            <textarea
-              ref={textAreaRef}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                isGeminiLiveMode 
-                  ? (isGeminiLiveListening ? "🎤 Live conversation..." : "Send message or start live conversation...")
-                  : (isListening ? "🎤 Listening..." : "Send message...")
-              }
-              className={`
-                flex-1 bg-transparent p-3 resize-none outline-none max-h-40
-                text-white placeholder:text-gray-500
-                ${(isGeminiLiveMode ? isGeminiLiveListening : isListening) ? 'placeholder:animate-pulse' : ''}
-              `}
-              rows={1}
-              disabled={isLoading}
-            />
-            
-            {/* Send Button */}
-            <button
-              onClick={handleSendMessage}
-              disabled={isLoading || (!text.trim() && attachments.length === 0)}
-              className={`
-                p-3 rounded-xl transition-all duration-200 focus-ring
-                ${isLoading || (!text.trim() && attachments.length === 0)
-                  ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
-                  : 'gradient-send text-white shadow-lg btn-interactive hover:shadow-xl'
-                }
-              `}
-              aria-label="Send message"
-              title="Send message"
-            >
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-</file>
-
 <file path="src/components/SettingsTab.tsx">
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
@@ -8565,6 +9200,323 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     <ChatContext.Provider value={value}>
       {children}
     </ChatContext.Provider>
+  );
+};
+</file>
+
+<file path="src/components/ChatInput.tsx">
+import React, { useState, useRef, useEffect } from 'react';
+import { Attachment } from '../types';
+import { SendIcon } from './icons/SendIcon';
+import { AttachmentIcon } from './icons/AttachmentIcon';
+import { XCircleIcon } from './icons/FileIcons';
+import { MicrophoneIcon } from './icons/MicrophoneIcon';
+import { useDeepgramLanguageDetection } from '../hooks/useDeepgramLanguageDetection';
+
+interface ChatInputProps {
+  onSendMessage: (text: string, attachments: Attachment[]) => void;
+  isLoading: boolean;
+  isListening: boolean;
+  startListening: () => void;
+  stopListening: () => void;
+  transcript: string;
+  isSttSupported: boolean;
+  // Gemini Live props
+  isGeminiLiveMode?: boolean;
+  startGeminiLive?: (detectedLanguage?: string) => void; // Updated to accept language
+  stopGeminiLive?: () => void;
+  isGeminiLiveListening?: boolean;
+  isGeminiLiveSupported?: boolean;
+}
+
+const MAX_FILES = 5;
+const MAX_FILE_SIZE_MB = 20;
+
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = (error) => reject(error);
+  });
+
+export const ChatInput: React.FC<ChatInputProps> = ({ 
+    onSendMessage, 
+    isLoading, 
+    isListening, 
+    startListening, 
+    stopListening,
+    transcript,
+    isSttSupported,
+    // Gemini Live props
+    isGeminiLiveMode = false,
+    startGeminiLive,
+    stopGeminiLive,
+    isGeminiLiveListening = false,
+    isGeminiLiveSupported = false,
+}) => {
+  const [text, setText] = useState('');
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [showLanguageDetection, setShowLanguageDetection] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Language detection hook
+  const {
+    detectLanguage,
+    isDetecting,
+    detectedLanguage,
+    error: detectionError,
+    reset: resetDetection,
+  } = useDeepgramLanguageDetection();
+
+  useEffect(() => {
+    setText(transcript);
+  }, [transcript]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textAreaRef.current) {
+      textAreaRef.current.style.height = 'auto';
+      textAreaRef.current.style.height = `${textAreaRef.current.scrollHeight}px`;
+    }
+  }, [text]);
+
+
+  const handleSendMessage = () => {
+    if (isLoading || (!text.trim() && attachments.length === 0)) return;
+    onSendMessage(text, attachments);
+    setText('');
+    setAttachments([]);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    if (attachments.length + files.length > MAX_FILES) {
+        alert(`You can only upload a maximum of ${MAX_FILES} files.`);
+        return;
+    }
+
+    const newAttachments: Attachment[] = [];
+    for (const file of files) {
+        if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+            alert(`File ${file.name} is too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
+            continue;
+        }
+        try {
+            const data = await fileToBase64(file);
+            newAttachments.push({ name: file.name, type: file.type, size: file.size, data });
+        } catch (error) {
+            console.error("Error converting file to base64", error);
+        }
+    }
+    setAttachments(prev => [...prev, ...newAttachments]);
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMicClick = async () => {
+      if (isGeminiLiveMode) {
+          // Gemini Live mode with language detection
+          if (isGeminiLiveListening) {
+              // Stop listening
+              stopGeminiLive?.();
+              setShowLanguageDetection(false);
+              resetDetection();
+          } else {
+              try {
+                  // Step 1: Detect language first
+                  setShowLanguageDetection(true);
+                  const languageResult = await detectLanguage();
+                  
+                  console.log('Detected language:', languageResult);
+                  
+                  // Step 2: Start Gemini Live with detected language
+                  startGeminiLive?.(languageResult.geminiLanguageCode);
+                  
+                  // Show language detection UI for 2 seconds
+                  setTimeout(() => {
+                      setShowLanguageDetection(false);
+                  }, 2000);
+                  
+              } catch (error) {
+                  console.error('Language detection failed:', error);
+                  // Fallback to default language
+                  startGeminiLive?.();
+                  setShowLanguageDetection(false);
+              }
+          }
+      } else {
+          // Traditional Web Speech API mode (unchanged)
+          if (isListening) {
+              stopListening();
+          } else {
+              startListening();
+          }
+      }
+  }
+
+  return (
+    <div className="p-6 border-t border-white/10 flex-shrink-0" style={{ background: 'var(--bg-input)' }}>
+      <div className="relative">
+        {/* Composer Container */}
+        <div className="glass rounded-2xl border border-white/10 overflow-hidden">
+          {/* Attachments Preview */}
+          {attachments.length > 0 && (
+            <div className="p-4 border-b border-white/10">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {attachments.map((file, index) => (
+                  <div key={index} className="bg-gray-700/50 p-3 rounded-xl flex items-center justify-between text-sm backdrop-blur">
+                    <span className="truncate text-white/90" title={file.name}>{file.name}</span>
+                    <button 
+                      onClick={() => removeAttachment(index)} 
+                      className="ml-2 text-gray-400 hover:text-red-400 transition-colors p-1 rounded-md hover:bg-red-500/10"
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      <XCircleIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Input Row */}
+          <div className="flex items-end p-2">
+            {/* Attachment Button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-3 text-gray-400 hover:text-white transition-all duration-200 rounded-lg hover:bg-white/5 focus-ring"
+              aria-label="Attach files"
+              title="Attach files"
+            >
+              <AttachmentIcon className="w-5 h-5" />
+            </button>
+            
+            {/* Microphone Button */}
+            <button
+              onClick={handleMicClick}
+              disabled={isGeminiLiveMode ? !isGeminiLiveSupported : !isSttSupported}
+              className={`
+                p-3 transition-all duration-200 rounded-lg focus-ring
+                disabled:opacity-50 disabled:cursor-not-allowed
+                ${(isGeminiLiveMode ? isGeminiLiveListening : isListening)
+                  ? 'text-red-400 bg-red-500/10 animate-glow-pulse' 
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }
+                ${isGeminiLiveMode ? 'ring-2 ring-blue-500/30' : ''}
+              `}
+              aria-label={(isGeminiLiveMode ? isGeminiLiveListening : isListening) ? 'Stop listening' : 'Start listening'}
+              title={
+                isGeminiLiveMode 
+                  ? (isGeminiLiveSupported 
+                      ? (isGeminiLiveListening ? 'Stop Gemini Live conversation' : 'Start Gemini Live conversation')
+                      : 'Gemini Live is not supported in your browser')
+                  : (isSttSupported 
+                      ? (isListening ? 'Stop listening' : 'Start listening') 
+                      : 'Speech-to-text is not supported in your browser')
+              }
+            >
+              <MicrophoneIcon className="w-5 h-5" />
+            </button>
+            
+            {/* Hidden File Input */}
+            <input
+              type="file"
+              multiple
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
+            />
+            
+            {/* Text Input */}
+            <textarea
+              ref={textAreaRef}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                isGeminiLiveMode 
+                  ? (isGeminiLiveListening ? "🎤 Live conversation..." : "Send message or start live conversation...")
+                  : (isListening ? "🎤 Listening..." : "Send message...")
+              }
+              className={`
+                flex-1 bg-transparent p-3 resize-none outline-none max-h-40
+                text-white placeholder:text-gray-500
+                ${(isGeminiLiveMode ? isGeminiLiveListening : isListening) ? 'placeholder:animate-pulse' : ''}
+              `}
+              rows={1}
+              disabled={isLoading}
+            />
+            
+            {/* Send Button */}
+            <button
+              onClick={handleSendMessage}
+              disabled={isLoading || (!text.trim() && attachments.length === 0)}
+              className={`
+                p-3 rounded-xl transition-all duration-200 focus-ring
+                ${isLoading || (!text.trim() && attachments.length === 0)
+                  ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                  : 'gradient-send text-white shadow-lg btn-interactive hover:shadow-xl'
+                }
+              `}
+              aria-label="Send message"
+              title="Send message"
+            >
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
+        
+        {/* Language Detection Display */}
+        {showLanguageDetection && detectedLanguage && (
+          <div className="absolute bottom-full mb-2 left-0 bg-gray-800 rounded-lg p-3 shadow-lg border border-green-500/30 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">
+                {detectedLanguage.language === 'nl' ? '🇳🇱' : 
+                 detectedLanguage.language === 'en' ? '🇬🇧' :
+                 detectedLanguage.language === 'de' ? '🇩🇪' :
+                 detectedLanguage.language === 'fr' ? '🇫🇷' : 
+                 detectedLanguage.language === 'es' ? '🇪🇸' :
+                 detectedLanguage.language === 'it' ? '🇮🇹' : '🌐'}
+              </span>
+              <div>
+                <p className="text-white font-medium">
+                  {detectedLanguage.language.toUpperCase()} detected
+                </p>
+                <p className="text-gray-400 text-sm">
+                  {Math.round(detectedLanguage.confidence * 100)}% confidence
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isDetecting && (
+          <div className="absolute bottom-full mb-2 left-0 bg-gray-800 rounded-lg p-3 shadow-lg">
+            <p className="text-white text-sm">🎤 Detecting language...</p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 </file>
@@ -9596,6 +10548,151 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 # NODE_ENV=development
 </file>
 
+<file path="api/deepgram-language-detect.ts">
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient } from '@deepgram/sdk';
+
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
+  // Enable CORS for Vercel deployment
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Defensive check for API key
+  const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
+  if (!deepgramApiKey) {
+    console.error('DEEPGRAM_API_KEY is not configured');
+    return res.status(500).json({ error: 'Server configuration error: Missing API key' });
+  }
+
+  try {
+    const { audioBase64 } = req.body;
+
+    if (!audioBase64) {
+      return res.status(400).json({ error: 'Audio data required' });
+    }
+
+    // Initialize Deepgram client
+    const deepgram = createClient(deepgramApiKey);
+
+    // Convert base64 to buffer
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+
+    if (audioBuffer.length === 0) {
+      return res.status(400).json({ error: 'Audio buffer is empty after decoding' });
+    }
+
+    // Call Deepgram Prerecorded API with language detection (v4.x format)
+    // Per official docs: https://developers.deepgram.com/docs/node-sdk-pre-recorded-transcription
+    // Audio is PCM Int16, mono, 16kHz from frontend AudioCaptureManager
+    const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
+      audioBuffer,  // First arg: audio buffer (PCM Int16)
+      {            // Second arg: options
+        encoding: 'linear16',  // PCM Int16 encoding
+        sample_rate: 16000,    // 16kHz sample rate
+        channels: 1,           // Mono audio
+        model: 'nova-2',
+        detect_language: true,
+        punctuate: true,
+        smart_format: true,
+      }
+    );
+
+    if (error) {
+      console.error('Deepgram API returned error:', error);
+      return res.status(500).json({ error: 'Deepgram API error', details: error });
+    }
+
+    // Validate response structure
+    if (!result?.results?.channels?.[0]) {
+      console.error('Invalid Deepgram response structure:', result);
+      return res.status(500).json({ error: 'Invalid response from Deepgram', result });
+    }
+
+    // Extract detected language from response
+    const channel = result.results.channels[0] as any; // Type assertion for language detection fields
+    const detectedLanguage = channel.detected_language;
+    const confidence = channel.alternatives?.[0]?.confidence || 0;
+    const alternatives = channel.language_alternatives || [];
+
+    // Map Deepgram language codes to Gemini Live BCP-47 codes
+    const languageMapping: Record<string, string> = {
+      'nl': 'nl-NL',
+      'en': 'en-US',
+      'de': 'de-DE',
+      'fr': 'fr-FR',
+      'es': 'es-ES',
+      'it': 'it-IT',
+      'pt': 'pt-BR',
+      'ja': 'ja-JP',
+      'ko': 'ko-KR',
+      'hi': 'hi-IN',
+      'ar': 'ar-XA',
+      'tr': 'tr-TR',
+      'vi': 'vi-VN',
+      'id': 'id-ID',
+      'pl': 'pl-PL',
+      'ru': 'ru-RU',
+      'th': 'th-TH',
+    };
+
+    const geminiLanguageCode = languageMapping[detectedLanguage] || 'en-US';
+
+    return res.status(200).json({
+      language: detectedLanguage,
+      geminiLanguageCode,
+      confidence,
+      alternatives: alternatives.map((alt: any) => ({
+        language: alt.language,
+        confidence: alt.confidence,
+        geminiLanguageCode: languageMapping[alt.language] || 'en-US',
+      })),
+      transcript: result.results.channels[0].alternatives[0].transcript,
+    });
+
+  } catch (error: any) {
+    // Comprehensive debug logging
+    console.error('========== DEEPGRAM API ERROR ===========');
+    console.error('Error Message:', error?.message || error);
+    console.error('Stack Trace:', error?.stack || 'No stack available');
+    console.error('Request Body:', req.body);
+    console.error('Deepgram Response:', error?.response || 'No response');
+    console.error('Environment Keys:', Object.keys(process.env));
+    console.error('DEEPGRAM_API_KEY exists:', !!process.env.DEEPGRAM_API_KEY);
+    console.error('==========================================');
+
+    // Return detailed debug info in response (REMOVE IN PRODUCTION)
+    return res.status(500).json({
+      error: 'Internal server error',
+      debug: {
+        message: error?.message || String(error),
+        stack: error?.stack || 'No stack trace',
+        deepgramError: error?.response || error?.error || null,
+        requestPayload: {
+          hasAudioBase64: !!req.body?.audioBase64,
+          audioBase64Length: req.body?.audioBase64?.length || 0,
+        },
+        environment: {
+          hasDeepgramKey: !!process.env.DEEPGRAM_API_KEY,
+          envKeys: Object.keys(process.env).filter(k => k.includes('DEEPGRAM')),
+        },
+      },
+    });
+  }
+}
+</file>
+
 <file path="src/components/EnhancedChatMessage.tsx">
 import React, { useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -9921,6 +11018,7 @@ export default EnhancedChatMessage;
     "preview": "vite preview"
   },
   "dependencies": {
+    "@deepgram/sdk": "^4.11.2",
     "@google/genai": "^1.21.0",
     "@google/generative-ai": "^0.24.1",
     "@heroicons/react": "^2.2.0",
