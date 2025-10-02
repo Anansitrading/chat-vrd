@@ -3,7 +3,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Modality } from '@google/genai';
 
-const LIVE_NATIVE_AUDIO_MODEL = 'gemini-2.0-flash-exp';
+const LIVE_NATIVE_AUDIO_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
