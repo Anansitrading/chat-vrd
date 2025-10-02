@@ -87,8 +87,15 @@ export const useGeminiLive = (config: LiveConfig = {}) => {
   const connect = useCallback(async () => {
     try {
       setState(s => ({ ...s, error: null }));
-      // 1) Get ephemeral token from our Vercel function
-      const r = await fetch('/api/generate-token', { method: 'POST' });
+      // 1) Get ephemeral token from our Vercel function with language
+      const r = await fetch('/api/generate-token', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          language: inputLang,
+          systemPrompt: config.systemPrompt 
+        })
+      });
       if (!r.ok) throw new Error('Failed to fetch ephemeral token');
       const { ephemeralToken } = await r.json();
 

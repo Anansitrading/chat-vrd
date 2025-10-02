@@ -11,6 +11,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Accept language and systemPrompt from request body
+    const { language, systemPrompt } = req.body || {};
+    const inputLang = language || 'nl-NL'; // Default to Dutch
+    
     const ai = new GoogleGenAI({}); // Server reads GEMINI_API_KEY from env
     const expireTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
@@ -21,9 +25,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         liveConnectConstraints: {
           model: LIVE_NATIVE_AUDIO_MODEL,
           config: {
-            // Guide the agent to speak Dutch
-            systemInstruction:
-              'Je bent een vriendelijke, behulpzame gesprekspartner die vloeiend Nederlands spreekt. Houd het gesprek volledig in het Nederlands.',
+            // Use provided system prompt or default
+            ...(systemPrompt ? { systemInstruction: systemPrompt } : {}),
             // Ask the Live session to output audio by default
             responseModalities: [Modality.AUDIO],
             // Optional: resume if network blips
