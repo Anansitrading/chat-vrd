@@ -17,10 +17,12 @@ interface ChatInputProps {
   isSttSupported: boolean;
   // Gemini Live props
   isGeminiLiveMode?: boolean;
-  startGeminiLive?: (detectedLanguage?: string) => void; // Updated to accept language
+  startGeminiLive?: () => void; // No parameters needed
   stopGeminiLive?: () => void;
   isGeminiLiveListening?: boolean;
   isGeminiLiveSupported?: boolean;
+  // Language detection callback
+  onLanguageDetected?: (languageCode: string) => void;
 }
 
 const MAX_FILES = 5;
@@ -48,6 +50,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     stopGeminiLive,
     isGeminiLiveListening = false,
     isGeminiLiveSupported = false,
+    // Language detection callback
+    onLanguageDetected,
 }) => {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -136,8 +140,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   
                   console.log('Detected language:', languageResult);
                   
-                  // Step 2: Start Gemini Live with detected language
-                  startGeminiLive?.(languageResult.geminiLanguageCode);
+                  // Step 2: Notify parent of detected language
+                  onLanguageDetected?.(languageResult.geminiLanguageCode);
+                  
+                  // Step 3: Start Gemini Live (language already set in parent)
+                  startGeminiLive?.();
                   
                   // Show language detection UI for 2 seconds
                   setTimeout(() => {
@@ -146,7 +153,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   
               } catch (error) {
                   console.error('Language detection failed:', error);
-                  // Fallback to default language
+                  // Fallback to default language (already set in parent)
                   startGeminiLive?.();
                   setShowLanguageDetection(false);
               }

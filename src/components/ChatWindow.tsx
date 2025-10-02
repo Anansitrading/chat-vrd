@@ -37,6 +37,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [currentLiveMessageId, setCurrentLiveMessageId] = useState<string | null>(null);
+  const [detectedLang, setDetectedLang] = useState<string>('nl-NL'); // State for detected language
   const { isListening, transcript, startListening, stopListening, setTranscript, isSttSupported } = useSpeechToText('nl-NL');
 
   // Gemini Live integration
@@ -57,7 +58,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     isSupported: isGeminiLiveSupported,
   } = useGeminiLive({
     audioOutput: liveAudioEnabled,
-    inputLang: 'nl-NL',
+    dynamicLanguageCode: detectedLang, // Pass detected language
+    inputLang: 'nl-NL', // Fallback default
     systemPrompt: settings.systemPrompt,
   });
   
@@ -501,6 +503,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         stopGeminiLive={stopGeminiLive}
         isGeminiLiveListening={isLiveListening}
         isGeminiLiveSupported={isGeminiLiveSupported}
+        // Language detection callback
+        onLanguageDetected={setDetectedLang}
       />
     </>
   );
